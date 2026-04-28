@@ -1,0 +1,115 @@
+---
+sidebar_position: 12
+title: Guion
+---
+
+# Guion de presentacion
+
+Duracion maxima: 30 minutos.
+
+## Acto 1: El Concepto
+
+Tiempo sugerido: 6 minutos.
+
+Contenido:
+
+- Que es A09.
+- Diferencia entre bloquear y observar.
+- Impacto en deteccion, investigacion y respuesta.
+
+Que mostrar:
+
+- Diagrama `Detectar -> Registrar -> Alertar -> Investigar`.
+- Tabla de impacto.
+
+:::tip CANVA - Acto 1
+Slides:
+
+1. Titulo A09.
+2. Bloquear vs observar.
+3. Impacto real.
+:::
+
+## Acto 2: Ataque en Vivo - Red Team
+
+Tiempo sugerido: 8 minutos.
+
+Pasos:
+
+1. Usar rama vulnerable.
+2. Ejecutar login fallido repetido.
+3. Intentar endpoint admin como alumno.
+4. Intentar expediente ajeno.
+5. Mostrar eventos/alertas vacios.
+
+Mensaje:
+
+> La aplicacion responde, pero no observa.
+
+:::tip CANVA - Acto 2
+Slides:
+
+4. Escenario de ataque.
+5. Evidencia: `401/403` sin eventos.
+:::
+
+## Acto 3: Causa Raiz
+
+Tiempo sugerido: 7 minutos.
+
+Archivos:
+
+- `AuthService.cs`.
+- `StudentRecordService.cs`.
+- `AdminService.cs`.
+- `SecurityController.cs`.
+- `Program.cs`.
+
+Explicacion:
+
+No hay pipeline de auditoria de seguridad.
+
+Mensaje:
+
+> La causa raiz no es una linea aislada; es la ausencia de una responsabilidad defensiva.
+
+:::tip CANVA - Acto 3
+Slides:
+
+6. Codigo vulnerable.
+7. Componentes faltantes.
+:::
+
+## Acto 4: Solucion - Blue Team
+
+Tiempo sugerido: 9 minutos.
+
+Pasos:
+
+1. Cambiar a rama `fixed`.
+2. Repetir login fallido.
+3. Mostrar `SecurityEvents`.
+4. Mostrar `SecurityAlerts`.
+5. Repetir acceso a expediente ajeno.
+6. Mostrar dashboard defensivo.
+
+Mensaje:
+
+> La defensa ahora produce evidencia, correlacion y alertas accionables.
+
+:::tip CANVA - Acto 4
+Slides:
+
+8. Arquitectura fixed.
+9. Eventos y alertas.
+10. Comparativa main vs fixed.
+11. Conclusiones.
+:::
+
+## Cierre
+
+Frase final:
+
+```text
+A09 nos enseña que una aplicacion no solo debe proteger recursos; tambien debe dejar evidencia para defenderlos.
+```

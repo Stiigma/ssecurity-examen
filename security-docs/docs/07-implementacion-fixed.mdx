@@ -1,0 +1,125 @@
+---
+sidebar_position: 8
+title: Implementacion fixed
+---
+
+# Implementacion en `fixed`
+
+Esta seccion resume como se relleno la configuracion faltante para corregir A09.
+
+## 1. Registro de servicios
+
+Archivo: `src/ExamenSecurity.Api/Program.cs`.
+
+Se agregaron servicios de auditoria, alertas y acceso al contexto HTTP:
+
+```csharp
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ISecurityAuditService, SecurityAuditService>();
+builder.Services.AddScoped<ISecurityAlertService, SecurityAlertService>();
+```
+
+## 2. Middleware de correlacion y errores
+
+Archivo: `src/ExamenSecurity.Api/Program.cs`.
+
+```csharp
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<GlobalExceptionMiddleware>();
+```
+
+Esto permite que cada evento tenga un `CorrelationId` y que los errores no controlados se conviertan en eventos `UnhandledException`.
+
+## 3. JWT failures y 403 auditados
+
+Archivo: `src/ExamenSecurity.Api/Program.cs`.
+
+Se configuraron eventos de JWT:
+
+```csharp
+options.Events = new JwtBearerEvents
+{
+    OnAuthenticationFailed = async context => { /* TokenAuthenticationFailed */ },
+    OnChallenge = async context => { /* UnauthorizedRequest */ },
+    OnForbidden = async context => { /* AccessDenied */ }
+};
+```
+
+## 4. Login fallido auditado
+
+Archivo: `src/ExamenSecurity.Api/Services/AuthService.cs`.
+
+```csharp
+await securityAuditService.AuditAsync(
+    new SecurityAuditRequest(
+        SecurityEventType.LoginFailed,
+        SecuritySeverity.Warning,
+        "Rejected",
+        "Intento de login fallido por credenciales invalidas.",
+        UserId: user.Id,
+        Username: user.Email,
+        Role: user.Role,
+        StatusCode: StatusCodes.Status401Unauthorized),
+    cancellationToken);
+```
+
+## 5. Acceso a expediente ajeno auditado
+
+Archivo: `src/ExamenSecurity.Api/Services/StudentRecordService.cs`.
+
+```csharp
+await securityAuditService.AuditAsync(
+    new SecurityAuditRequest(
+        SecurityEventType.StudentRecordAccessDenied,
+        SecuritySeverity.High,
+        "Forbidden",
+        "Usuario intento consultar el expediente academico de otro alumno.",
+        UserId: currentUserId,
+        StatusCode: StatusCodes.Status403Forbidden,
+        ResourceType: "StudentUser",
+        ResourceId: requestedStudentUserId.ToString()),
+    cancellationToken);
+```
+
+## 6. Acciones administrativas auditadas
+
+Archivo: `src/ExamenSecurity.Api/Services/AdminService.cs`.
+
+Eventos implementados:
+
+- `AdminUserCreated`.
+- `AdminUserDisabled`.
+- `ApiClientDisabled`.
+- `ConfigurationChanged`.
+
+## 7. Tickets de seguridad con alerta
+
+Archivo: `src/ExamenSecurity.Api/Services/SupportTicketService.cs`.
+
+Si `IsSecurityRelevant` es `true`, se crea `SecurityTicketCreated` y luego `SecurityAlertService` genera alerta interna.
+
+## 8. Sanitizacion de metadata
+
+Archivo: `src/ExamenSecurity.Api/Services/SecurityAuditService.cs`.
+
+El servicio redacta claves sensibles:
+
+```text
+password
+token
+authorization
+secret
+signingkey
+credential
+```
+
+:::tip CANVA - Slide de implementacion
+Tabla para slide:
+
+| Antes | Despues |
+|---|---|
+| `return Unauthorized()` | `Audit(LoginFailed) + 401` |
+| `return Forbid()` | `Audit(AccessDenied) + 403` |
+| Admin action sin rastro | Evento + alerta |
+| Error sin correlacion | `UnhandledException + CorrelationId` |
+:::

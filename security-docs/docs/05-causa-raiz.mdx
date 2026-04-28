@@ -1,0 +1,74 @@
+---
+sidebar_position: 6
+title: Causa raiz
+---
+
+# Causa raiz tecnica
+
+La vulnerabilidad aparece por una ausencia de diseño de observabilidad de seguridad.
+
+## Supuesto fallido
+
+El sistema asume:
+
+```text
+Si una peticion fue rechazada, entonces el sistema esta seguro.
+```
+
+Ese supuesto es incompleto. En seguridad defensiva tambien se necesita:
+
+```text
+Si una peticion fue sospechosa, debe quedar evidencia y debe evaluarse si requiere alerta.
+```
+
+## Responsabilidad omitida
+
+La responsabilidad omitida esta en el backend, no en el frontend.
+
+El frontend puede mostrar u ocultar botones, pero no puede ser la fuente confiable de auditoria.
+
+## Componentes faltantes en vulnerable
+
+| Componente faltante | Consecuencia |
+|---|---|
+| Evento de seguridad persistente | No hay evidencia durable |
+| Correlation ID | No se puede seguir una request entre logs |
+| Severidad | No se puede priorizar |
+| Metadata sanitizada | No hay contexto seguro |
+| Alertas internas | No hay respuesta operativa |
+| Captura global de errores | Errores quedan sin investigacion |
+| Logging de JWT | Tokens invalidos no dejan rastro |
+
+:::tip CANVA - Slide de causa raiz
+Diagrama simple:
+
+`Request sospechosa -> Decision de seguridad -> [FALTA] Evento -> [FALTA] Alerta -> [FALTA] Investigacion`
+:::
+
+## Archivos donde se observa
+
+| Archivo vulnerable | Problema |
+|---|---|
+| `AuthService.cs` | Login fallido y password reset sin auditoria |
+| `StudentRecordService.cs` | Acceso a expediente ajeno sin evidencia |
+| `AdminService.cs` | Acciones administrativas sin bitacora de seguridad |
+| `SupportTicketService.cs` | Tickets de seguridad sin alerta |
+| `SecurityController.cs` | Endpoints de eventos/alertas devuelven arreglos vacios |
+| `Program.cs` | JWT failures y 403 no se convierten en eventos |
+
+## Principio incumplido
+
+La aplicacion incumple trazabilidad defensiva:
+
+- No registra actor.
+- No registra recurso.
+- No registra resultado.
+- No registra IP o user-agent.
+- No correlaciona.
+- No alerta.
+
+Mensaje tecnico:
+
+```text
+La falla A09 no es un bug aislado; es una falta de pipeline de observabilidad de seguridad.
+```

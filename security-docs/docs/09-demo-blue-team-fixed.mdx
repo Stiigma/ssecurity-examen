@@ -1,0 +1,137 @@
+---
+sidebar_position: 10
+title: Demo Blue Team
+---
+
+# Demo Blue Team: validacion en `fixed`
+
+La demo Blue Team repite los mismos pasos del ataque, pero ahora muestra eventos y alertas.
+
+## Preparacion
+
+Ejecutar:
+
+```bash
+docker compose up --build
+```
+
+API:
+
+```text
+http://localhost:5000
+```
+
+Archivo de apoyo:
+
+```text
+backend/http/demo-fixed.http
+```
+
+## Paso 1: Login fallido repetido
+
+Enviar 5 veces:
+
+```http
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@demo.local",
+  "password": "PasswordIncorrecto123!"
+}
+```
+
+Resultado esperado:
+
+- Respuesta `401`.
+- Eventos `LoginFailed`.
+- Alerta `MultipleFailedLogins`.
+
+Ver eventos:
+
+```http
+GET /api/security/events?eventType=LoginFailed
+Authorization: Bearer <adminToken>
+```
+
+Ver alertas:
+
+```http
+GET /api/security/alerts?onlyUnacknowledged=true
+Authorization: Bearer <adminToken>
+```
+
+## Paso 2: Acceso denegado a admin
+
+Como `student1`:
+
+```http
+GET /api/admin/users
+Authorization: Bearer <studentToken>
+```
+
+Resultado esperado:
+
+- Respuesta `403`.
+- Evento `AccessDenied`.
+- Si se repite 3 veces, alerta `AdminEndpointProbing`.
+
+## Paso 3: Expediente ajeno
+
+Como `student1`, repetir 2 veces:
+
+```http
+GET /api/student-records/by-user/20000000-0000-0000-0000-000000000002
+Authorization: Bearer <studentToken>
+```
+
+Resultado esperado:
+
+- Respuesta `403`.
+- Evento `StudentRecordAccessDenied`.
+- Alerta `StudentRecordProbing`.
+
+## Paso 4: Ticket de seguridad
+
+```http
+POST /api/support-tickets
+Authorization: Bearer <studentToken>
+Content-Type: application/json
+
+{
+  "subject": "Actividad sospechosa en mi cuenta",
+  "description": "Vi intentos de acceso que no reconozco y quiero que seguridad revise la actividad.",
+  "isSecurityRelevant": true
+}
+```
+
+Resultado esperado:
+
+- Evento `SecurityTicketCreated`.
+- Alerta `SecurityTicketRequiresReview`.
+
+## Paso 5: Dashboard defensivo
+
+```http
+GET /api/security/dashboard-summary
+Authorization: Bearer <auditorToken>
+```
+
+Muestra:
+
+- Total de eventos.
+- Eventos altos o criticos.
+- Alertas abiertas.
+- Logins fallidos recientes.
+- Accesos denegados recientes.
+
+:::tip CANVA - Slide comparativa final
+Tabla recomendada:
+
+| Prueba | main/master | fixed |
+|---|---|---|
+| Login fallido x5 | Solo `401` | Eventos + alerta |
+| Alumno a admin | Solo `403` | Evento + posible alerta |
+| Expediente ajeno | Solo `403` | Evento + alerta |
+| Ticket seguridad | Ticket normal | Evento + alerta |
+:::

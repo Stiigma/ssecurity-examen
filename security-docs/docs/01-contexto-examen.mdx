@@ -1,0 +1,71 @@
+---
+sidebar_position: 2
+title: Contexto del examen
+---
+
+# Contexto del examen
+
+La evaluacion pide demostrar una vulnerabilidad del OWASP Top 10 con una aplicacion propia, explicar su causa raiz y corregirla profesionalmente.
+
+El tema asignado al equipo es:
+
+```text
+A09:2025 - Security Logging and Alerting Failures
+```
+
+## Objetivo tecnico del proyecto
+
+Construir un backend que permita comparar dos estados:
+
+| Version | Comportamiento |
+|---|---|
+| Vulnerable | La API rechaza o procesa eventos, pero no deja evidencia defensiva |
+| Corregida | La API registra eventos, correlaciona requests y genera alertas internas |
+
+:::tip CANVA - Slide de objetivo
+Frase recomendada:
+
+> No basta con bloquear. Una defensa profesional tambien debe detectar, registrar, alertar e investigar.
+:::
+
+## Sistema usado para la demo
+
+La aplicacion simula un **sistema academico de expedientes**.
+
+Modulos:
+
+- Autenticacion con JWT.
+- Roles `Admin`, `Auditor` y `Student`.
+- Expedientes academicos.
+- Administracion de usuarios.
+- Clientes de API.
+- Tickets de soporte.
+- Eventos y alertas de seguridad en la rama `fixed`.
+
+Usuarios ficticios:
+
+| Usuario | Password | Rol |
+|---|---|---|
+| `admin@demo.local` | `Admin123!` | Admin |
+| `auditor@demo.local` | `Auditor123!` | Auditor |
+| `student1@demo.local` | `Student123!` | Student |
+| `student2@demo.local` | `Student123!` | Student |
+| `disabled@demo.local` | `Disabled123!` | Student deshabilitado |
+
+## Stack
+
+- .NET 10 / ASP.NET Core Web API.
+- SQL Server.
+- Entity Framework Core.
+- JWT Bearer.
+- Docker Compose.
+- Docusaurus para documentacion.
+
+## Narrativa requerida
+
+| Acto | Enfoque |
+|---|---|
+| Acto 1 | Concepto de A09 |
+| Acto 2 | Ataque en vivo contra la version vulnerable |
+| Acto 3 | Causa raiz en codigo |
+| Acto 4 | Solucion Blue Team en la rama `fixed` |

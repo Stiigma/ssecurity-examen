@@ -1,0 +1,67 @@
+---
+sidebar_position: 3
+title: Concepto A09
+---
+
+# Concepto: A09 Security Logging and Alerting Failures
+
+A09 ocurre cuando una aplicacion no registra eventos de seguridad importantes, no genera alertas ante patrones sospechosos o registra datos inutiles para investigacion.
+
+## La idea central
+
+Una aplicacion puede tener login, roles y validaciones, pero aun asi fallar defensivamente si no responde estas preguntas:
+
+- Quien intento acceder.
+- Desde donde.
+- A que recurso.
+- Que resultado obtuvo.
+- En que momento ocurrio.
+- Si el comportamiento fue repetido.
+- Si alguien debe revisar el incidente.
+
+:::tip CANVA - Slide conceptual
+Usa esta comparacion:
+
+| Bloquear | Observar |
+|---|---|
+| Devuelve `401` o `403` | Guarda evidencia |
+| Protege el recurso inmediato | Permite investigar |
+| Resuelve la request | Activa respuesta defensiva |
+:::
+
+## Impacto
+
+Sin logging ni alerting:
+
+- Un password spraying puede pasar desapercibido.
+- Un usuario puede sondear endpoints administrativos sin dejar rastro.
+- Un alumno puede intentar consultar expedientes ajenos sin evidencia.
+- Un atacante con cuenta comprometida puede hacer cambios administrativos sin trazabilidad suficiente.
+- El equipo no puede demostrar que ocurrio, cuando ocurrio ni quien estuvo involucrado.
+
+## Que NO es una buena correccion
+
+No basta con:
+
+- Imprimir mensajes sueltos en consola.
+- Guardar logs tecnicos sin usuario, endpoint o resultado.
+- Registrar passwords, tokens o secretos.
+- Depender solo del frontend.
+- Decir que el admin "deberia revisar manualmente" sin alertas.
+
+## Que SI se espera en una correccion profesional
+
+- Eventos persistidos.
+- Campos estructurados.
+- Correlation ID.
+- Severidad.
+- Metadata sanitizada.
+- Alertas por umbrales.
+- Endpoints de investigacion protegidos.
+- No guardar secretos.
+
+:::tip CANVA - Slide de impacto
+Mensaje recomendado:
+
+> Una falla A09 convierte un incidente real en una historia incompleta: hay daño potencial, pero no hay evidencia suficiente para responder.
+:::

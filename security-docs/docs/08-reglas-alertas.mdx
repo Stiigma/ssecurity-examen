@@ -1,0 +1,66 @@
+---
+sidebar_position: 9
+title: Reglas de alertas
+---
+
+# Reglas de alertas internas
+
+El servicio `SecurityAlertService` evalua eventos y crea alertas internas en SQL Server.
+
+## Tabla de reglas
+
+| Alerta | Regla | Severidad |
+|---|---|---|
+| `MultipleFailedLogins` | 5 `LoginFailed` en 10 minutos por usuario o IP | High |
+| `DisabledAccountTargeted` | 2 intentos contra cuenta deshabilitada | High |
+| `AdminEndpointProbing` | 3 `AccessDenied` contra `/api/admin` | High |
+| `StudentRecordProbing` | 2 intentos de expediente ajeno | High |
+| `SensitiveAdminChange` | Cambio administrativo sensible | High |
+| `SecurityTicketRequiresReview` | Ticket marcado como seguridad | Medium |
+| `RepeatedUnhandledErrors` | 3 errores no controlados en mismo endpoint | Error |
+
+## Ejemplo de regla
+
+Archivo: `src/ExamenSecurity.Api/Services/SecurityAlertService.cs`.
+
+```csharp
+if (count >= 5)
+{
+    await CreateAlertIfMissingAsync(
+        SecurityAlertType.MultipleFailedLogins,
+        SecuritySeverity.High,
+        "Multiples intentos fallidos de login",
+        $"Se detectaron {count} intentos fallidos de autenticacion en una ventana de 10 minutos.",
+        securityEvent,
+        count,
+        cancellationToken);
+}
+```
+
+## Por que umbrales internos
+
+Los umbrales evitan que cada evento individual se vuelva una alerta.
+
+Ejemplo:
+
+- Un login fallido puede ser error humano.
+- Cinco fallos en 10 minutos contra el mismo usuario o IP ya son sospechosos.
+
+:::tip CANVA - Slide de alertas
+Visual recomendado:
+
+`LoginFailed x1 = evento`
+
+`LoginFailed x5 = alerta`
+:::
+
+## Reconocimiento de alertas
+
+Endpoint:
+
+```http
+POST /api/security/alerts/{id}/acknowledge
+Authorization: Bearer <adminToken>
+```
+
+Este endpoint marca la alerta como reconocida y registra un evento `AlertAcknowledged`.

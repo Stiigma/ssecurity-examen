@@ -1,0 +1,90 @@
+---
+sidebar_position: 7
+title: Diseno fixed
+---
+
+# Diseno de la solucion en `fixed`
+
+La rama `fixed` agrega un pipeline de observabilidad defensiva.
+
+## Objetivo
+
+Convertir eventos relevantes en evidencia accionable:
+
+```text
+Request sospechosa
+  -> SecurityAuditService
+  -> SecurityEvents en SQL Server
+  -> SecurityAlertService
+  -> SecurityAlerts en SQL Server
+  -> Endpoints de investigacion
+```
+
+:::tip CANVA - Slide Blue Team
+Usa este flujo visual:
+
+`Detectar -> Registrar -> Correlacionar -> Alertar -> Investigar`
+:::
+
+## Entidades nuevas
+
+### SecurityEvent
+
+Archivo: `src/ExamenSecurity.Api/Entities/SecurityEvent.cs`.
+
+Campos relevantes:
+
+| Campo | Proposito |
+|---|---|
+| `EventType` | Tipo de evento: login fallido, acceso denegado, etc. |
+| `Severity` | Prioridad defensiva |
+| `UserId`, `Username`, `Role` | Actor |
+| `IpAddress`, `UserAgent` | Contexto de origen |
+| `HttpMethod`, `Path`, `StatusCode` | Contexto HTTP |
+| `ResourceType`, `ResourceId` | Recurso afectado |
+| `Outcome` | Resultado |
+| `MetadataJson` | Contexto adicional sanitizado |
+| `CorrelationId` | Relacion entre request, evento y respuesta |
+| `CreatedAtUtc` | Tiempo confiable |
+
+### SecurityAlert
+
+Archivo: `src/ExamenSecurity.Api/Entities/SecurityAlert.cs`.
+
+Campos relevantes:
+
+| Campo | Proposito |
+|---|---|
+| `AlertType` | Tipo de alerta |
+| `Severity` | Prioridad |
+| `Title`, `Description` | Mensaje operativo |
+| `RelatedUserId`, `RelatedUsername`, `RelatedIpAddress` | Sujeto relacionado |
+| `EventCount` | Evidencia de umbral |
+| `IsAcknowledged` | Estado de revision |
+| `AcknowledgedByUserId` | Quien reconocio la alerta |
+
+## Servicios nuevos
+
+| Servicio | Responsabilidad |
+|---|---|
+| `SecurityAuditService` | Enriquecer y persistir eventos |
+| `SecurityAlertService` | Evaluar reglas y crear alertas |
+| `CorrelationIdMiddleware` | Crear o propagar `X-Correlation-ID` |
+| `GlobalExceptionMiddleware` | Capturar errores como eventos sin filtrar detalles |
+
+## Por que no se agregaron notificaciones externas
+
+No se implementaron correo, Slack, Teams ni webhooks reales.
+
+Razon:
+
+- La demo debe ser reproducible sin internet.
+- No debe depender de credenciales externas.
+- SQL Server permite demostrar la defensa de forma clara.
+- Las notificaciones externas pueden agregarse despues con una cola/outbox.
+
+:::tip CANVA - Slide de alcance
+Frase recomendada:
+
+> Para el examen priorizamos alertas internas confiables. Las notificaciones externas son una extension, no la defensa base.
+:::

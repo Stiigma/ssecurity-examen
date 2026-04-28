@@ -1,0 +1,88 @@
+---
+sidebar_position: 4
+title: Version vulnerable
+---
+
+# Version vulnerable: `master` / `main`
+
+En la rama vulnerable la API tiene autenticacion y autorizacion, pero no produce evidencia defensiva suficiente.
+
+## Resumen de la falla
+
+| Caso | Que pasa en vulnerable | Por que es A09 |
+|---|---|---|
+| Login fallido | Devuelve `401` | No registra evento ni cuenta intentos |
+| Cuenta deshabilitada | Devuelve `401` | No queda evidencia de intento contra cuenta sensible |
+| Endpoint admin denegado | Devuelve `403` | No registra sondeo administrativo |
+| Expediente ajeno | Devuelve `403` | No registra intento contra datos privados |
+| Ticket de seguridad | Se guarda como ticket normal | No genera alerta operativa |
+| Error no controlado | Falla sin evento durable | No hay investigacion correlacionada |
+
+:::tip CANVA - Slide Red Team
+Titulo sugerido: **El ataque no siempre rompe la puerta; a veces solo prueba si alguien esta mirando**.
+:::
+
+## Evidencia en codigo vulnerable
+
+Archivo: `src/ExamenSecurity.Api/Services/AuthService.cs` en `master`.
+
+```csharp
+if (user is null)
+{
+    // Unknown account login attempts are rejected but not audited.
+    return null;
+}
+
+if (!user.IsEnabled)
+{
+    // Attempts against disabled accounts are security-relevant,
+    // but this version leaves no durable trace.
+    return null;
+}
+
+if (!PasswordHasher.Verify(request.Password, user.PasswordHash))
+{
+    // Failed logins are not counted, correlated by IP/user, persisted, or alerted.
+    return null;
+}
+```
+
+El problema no es que devuelva `null`; el problema es que el flujo termina sin crear un evento de seguridad.
+
+## Endpoint de seguridad vulnerable
+
+Archivo: `src/ExamenSecurity.Api/Controllers/SecurityController.cs` en `master`.
+
+```csharp
+[HttpGet("events")]
+public IActionResult GetEvents()
+{
+    return Ok(new
+    {
+        events = Array.Empty<object>(),
+        a09 = "Version main vulnerable: no existe almacenamiento real de eventos de seguridad."
+    });
+}
+```
+
+Esto demuestra que no hay tabla ni fuente real de eventos.
+
+## Causa raiz
+
+La aplicacion confunde **rechazar una peticion** con **tener monitoreo de seguridad**.
+
+La capa backend valida ciertos accesos, pero no existe:
+
+- `SecurityEvent`.
+- `SecurityAlert`.
+- Servicio central de auditoria.
+- Middleware de correlation ID.
+- Captura global de errores como eventos.
+- Registro de fallos JWT.
+- Reglas de alertamiento.
+
+:::tip CANVA - Slide causa raiz
+Frase recomendada:
+
+> La seguridad no termina en `return Unauthorized()`. Si no hay evento, no hay investigacion.
+:::

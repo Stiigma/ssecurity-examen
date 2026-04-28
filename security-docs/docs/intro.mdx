@@ -1,0 +1,57 @@
+---
+sidebar_position: 1
+title: Inicio
+---
+
+# Seminario A09: Security Logging and Alerting Failures
+
+Esta documentacion acompaña el backend del examen practico. El objetivo es demostrar, corregir y defender la vulnerabilidad **A09:2025 - Security Logging and Alerting Failures** en una API .NET con SQL Server.
+
+:::warning Alcance etico
+El proyecto esta diseñado para laboratorio local, con usuarios y datos ficticios. No debe usarse para probar sistemas externos ni credenciales reales.
+:::
+
+:::tip CANVA - Slide de apertura
+Titulo recomendado: **A09: cuando una aplicacion esta protegida, pero ciega**.
+
+Mensaje corto: la aplicacion puede rechazar ataques con `401` o `403`, pero si no deja evidencia ni alerta, el equipo no puede detectar ni responder.
+:::
+
+## Estructura de ramas
+
+| Rama | Estado | Proposito |
+|---|---|---|
+| `master` / `main` | Vulnerable | Demuestra ausencia de auditoria y alertas |
+| `fixed` | Corregida | Registra eventos de seguridad en BD y genera alertas internas |
+
+> Nota: en este repositorio local la rama vulnerable se llama `master`. Si GitHub o la entrega requieren `main`, se puede renombrar antes de entregar.
+
+## Que se documenta aqui
+
+- Que es A09 y por que importa.
+- Como se ve la falla en la rama vulnerable.
+- En que archivos aparece la causa raiz.
+- Como se implemento la correccion en `fixed`.
+- Como ejecutar las demos Red Team y Blue Team.
+- Que contenido puede ir a la presentacion en Canva.
+
+## Comandos del sitio
+
+El proyecto Docusaurus fue creado con:
+
+```bash
+npx create-docusaurus@latest security-docs classic --typescript
+```
+
+Para correr la documentacion:
+
+```bash
+cd backend/security-docs
+npm start
+```
+
+Para validar build estatico:
+
+```bash
+npm run build
+```

@@ -1,0 +1,128 @@
+---
+sidebar_position: 5
+title: Demo Red Team
+---
+
+# Demo Red Team: reproduccion en `master` / `main`
+
+Esta demo muestra que la version vulnerable responde a algunos ataques, pero no deja evidencia util.
+
+## Preparacion
+
+Ejecutar backend:
+
+```bash
+docker compose up --build
+```
+
+API:
+
+```text
+http://localhost:5000
+```
+
+## Caso 1: Login fallido repetido
+
+Enviar varias veces:
+
+```http
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@demo.local",
+  "password": "PasswordIncorrecto123!"
+}
+```
+
+Resultado vulnerable:
+
+```text
+401 Unauthorized
+```
+
+Problema:
+
+```text
+No hay LoginFailed persistido.
+No hay conteo por usuario o IP.
+No hay alerta por multiples intentos.
+```
+
+:::tip CANVA - Slide demo 1
+Antes/despues visual:
+
+`Ataque -> 401 -> eventos vacios -> alertas vacias`
+:::
+
+## Caso 2: Alumno intenta endpoint administrativo
+
+1. Iniciar sesion como `student1@demo.local`.
+2. Usar su JWT contra:
+
+```http
+GET /api/admin/users
+Authorization: Bearer <studentToken>
+```
+
+Resultado vulnerable:
+
+```text
+403 Forbidden
+```
+
+Problema:
+
+```text
+No queda registro de que un alumno intento una funcion administrativa.
+```
+
+## Caso 3: Alumno sondea expediente ajeno
+
+Como `student1`, intentar:
+
+```http
+GET /api/student-records/by-user/20000000-0000-0000-0000-000000000002
+Authorization: Bearer <studentToken>
+```
+
+Resultado vulnerable:
+
+```text
+403 Forbidden
+```
+
+Problema:
+
+```text
+El acceso se bloquea, pero no queda evidencia investigable.
+```
+
+## Caso 4: Verificar eventos y alertas
+
+Como admin o auditor:
+
+```http
+GET /api/security/events
+GET /api/security/alerts
+```
+
+Resultado vulnerable:
+
+```json
+{
+  "events": []
+}
+```
+
+```json
+{
+  "alerts": []
+}
+```
+
+:::tip CANVA - Slide cierre Red Team
+Frase recomendada:
+
+> El atacante no logro entrar en todos los casos, pero el defensor tampoco logro enterarse.
+:::

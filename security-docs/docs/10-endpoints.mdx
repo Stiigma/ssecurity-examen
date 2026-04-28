@@ -1,0 +1,85 @@
+---
+sidebar_position: 11
+title: Endpoints
+---
+
+# Endpoints para exposicion
+
+## Autenticacion
+
+```http
+POST /api/auth/login
+POST /api/auth/password-reset/request
+GET  /api/auth/me
+```
+
+## Expedientes
+
+```http
+GET /api/student-records/me
+GET /api/student-records/by-user/{studentUserId}
+```
+
+IDs demo:
+
+```text
+student1: 20000000-0000-0000-0000-000000000001
+student2: 20000000-0000-0000-0000-000000000002
+disabled: 20000000-0000-0000-0000-000000000003
+```
+
+## Administracion
+
+```http
+GET  /api/admin/users
+POST /api/admin/users/{userId}/disable
+GET  /api/admin/api-clients
+POST /api/admin/api-clients/{clientId}/disable
+POST /api/admin/configuration
+```
+
+## Soporte
+
+```http
+POST /api/support-tickets
+GET  /api/support-tickets/mine
+GET  /api/support-tickets
+```
+
+## Seguridad en `fixed`
+
+```http
+GET  /api/security/events
+GET  /api/security/events/{id}
+GET  /api/security/alerts
+GET  /api/security/alerts/{id}
+POST /api/security/alerts/{id}/acknowledge
+GET  /api/security/dashboard-summary
+GET  /api/security/observability-readiness
+```
+
+## Filtros utiles
+
+Eventos:
+
+```http
+GET /api/security/events?eventType=LoginFailed&page=1&pageSize=20
+GET /api/security/events?severity=High
+GET /api/security/events?username=admin@demo.local
+```
+
+Alertas:
+
+```http
+GET /api/security/alerts?onlyUnacknowledged=true
+GET /api/security/alerts?alertType=MultipleFailedLogins
+```
+
+:::tip CANVA - Slide de demo tecnica
+Incluye solo 4 endpoints en slide:
+
+- `POST /api/auth/login`
+- `GET /api/admin/users`
+- `GET /api/security/events`
+- `GET /api/security/alerts`
+:::

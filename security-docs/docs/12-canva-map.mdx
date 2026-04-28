@@ -1,0 +1,75 @@
+---
+sidebar_position: 13
+title: Mapa Canva
+---
+
+# Mapa para Canva
+
+Esta pagina resume que partes de la documentacion conviene convertir en diapositivas.
+
+## Estructura sugerida
+
+| Slide | Titulo | Fuente en docs |
+|---:|---|---|
+| 1 | A09: cuando una aplicacion esta protegida, pero ciega | Inicio |
+| 2 | Bloquear vs observar | Concepto A09 |
+| 3 | Impacto de no tener logging ni alerting | Concepto A09 |
+| 4 | Sistema de demo y usuarios | Contexto del examen |
+| 5 | Ataque Red Team | Demo Red Team |
+| 6 | Evidencia en `main`: eventos vacios | Version vulnerable |
+| 7 | Causa raiz tecnica | Causa raiz |
+| 8 | Arquitectura Blue Team | Diseno fixed |
+| 9 | Eventos persistidos | Implementacion fixed |
+| 10 | Reglas de alertas | Reglas de alertas |
+| 11 | Demo fixed: ataque repetido, ahora visible | Demo Blue Team |
+| 12 | Comparativa final | Demo Blue Team |
+| 13 | Conclusiones | Guion |
+
+## Texto corto reutilizable
+
+### Problema
+
+```text
+La aplicacion rechaza ataques, pero no deja evidencia suficiente para detectarlos, investigarlos o responder.
+```
+
+### Causa raiz
+
+```text
+El backend no tenia un pipeline de auditoria: no habia eventos persistidos, correlation ID, severidad ni alertas por patrones.
+```
+
+### Solucion
+
+```text
+La rama fixed registra eventos en SQL Server, genera alertas internas y expone endpoints protegidos para investigacion.
+```
+
+### Conclusiones
+
+```text
+Bloquear protege el recurso inmediato. Observar protege la capacidad de respuesta.
+```
+
+## Graficos recomendados
+
+1. Flujo vulnerable:
+
+```text
+Ataque -> 401/403 -> Sin evento -> Sin alerta -> Sin investigacion
+```
+
+2. Flujo corregido:
+
+```text
+Ataque -> 401/403 -> SecurityEvent -> SecurityAlert -> Investigacion
+```
+
+3. Tabla comparativa:
+
+| Caso | main/master | fixed |
+|---|---|---|
+| Login fallido x5 | Sin evidencia | Eventos + alerta |
+| Acceso admin denegado | Sin rastro | AccessDenied |
+| Expediente ajeno | Sin trazabilidad | StudentRecordAccessDenied |
+| Ticket seguridad | No escala | Alerta interna |
