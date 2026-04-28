@@ -1,0 +1,27 @@
+{
+  "id": "version-vulnerable-main",
+  "title": "Version vulnerable",
+  "description": "En la rama vulnerable la API tiene autenticacion y autorizacion, pero no produce evidencia defensiva suficiente.",
+  "source": "@site/docs/03-version-vulnerable-main.mdx",
+  "sourceDirName": ".",
+  "slug": "/version-vulnerable-main",
+  "permalink": "/docs/version-vulnerable-main",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 4,
+  "frontMatter": {
+    "sidebar_position": 4,
+    "title": "Version vulnerable"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Concepto A09",
+    "permalink": "/docs/concepto-a09"
+  },
+  "next": {
+    "title": "Demo Red Team",
+    "permalink": "/docs/demo-red-team-main"
+  }
+}

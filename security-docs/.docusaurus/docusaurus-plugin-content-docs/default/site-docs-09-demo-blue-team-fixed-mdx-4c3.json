@@ -1,0 +1,27 @@
+{
+  "id": "demo-blue-team-fixed",
+  "title": "Demo Blue Team",
+  "description": "La demo Blue Team repite los mismos pasos del ataque, pero ahora muestra eventos y alertas.",
+  "source": "@site/docs/09-demo-blue-team-fixed.mdx",
+  "sourceDirName": ".",
+  "slug": "/demo-blue-team-fixed",
+  "permalink": "/docs/demo-blue-team-fixed",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 10,
+  "frontMatter": {
+    "sidebar_position": 10,
+    "title": "Demo Blue Team"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Reglas de alertas",
+    "permalink": "/docs/reglas-alertas"
+  },
+  "next": {
+    "title": "Endpoints",
+    "permalink": "/docs/endpoints"
+  }
+}

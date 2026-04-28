@@ -1,0 +1,27 @@
+{
+  "id": "diseno-fixed",
+  "title": "Diseno fixed",
+  "description": "La rama fixed agrega un pipeline de observabilidad defensiva.",
+  "source": "@site/docs/06-diseno-fixed.mdx",
+  "sourceDirName": ".",
+  "slug": "/diseno-fixed",
+  "permalink": "/docs/diseno-fixed",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 7,
+  "frontMatter": {
+    "sidebar_position": 7,
+    "title": "Diseno fixed"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Causa raiz",
+    "permalink": "/docs/causa-raiz"
+  },
+  "next": {
+    "title": "Implementacion fixed",
+    "permalink": "/docs/implementacion-fixed"
+  }
+}

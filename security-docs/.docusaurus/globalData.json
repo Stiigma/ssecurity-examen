@@ -1,0 +1,93 @@
+{
+  "docusaurus-plugin-content-docs": {
+    "default": {
+      "path": "/docs",
+      "versions": [
+        {
+          "name": "current",
+          "label": "Next",
+          "isLast": true,
+          "path": "/docs",
+          "mainDocId": "intro",
+          "docs": [
+            {
+              "id": "canva-map",
+              "path": "/docs/canva-map",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "causa-raiz",
+              "path": "/docs/causa-raiz",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "concepto-a09",
+              "path": "/docs/concepto-a09",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "contexto-examen",
+              "path": "/docs/contexto-examen",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "demo-blue-team-fixed",
+              "path": "/docs/demo-blue-team-fixed",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "demo-red-team-main",
+              "path": "/docs/demo-red-team-main",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "diseno-fixed",
+              "path": "/docs/diseno-fixed",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "endpoints",
+              "path": "/docs/endpoints",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "guion-presentacion",
+              "path": "/docs/guion-presentacion",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "implementacion-fixed",
+              "path": "/docs/implementacion-fixed",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "intro",
+              "path": "/docs/intro",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "reglas-alertas",
+              "path": "/docs/reglas-alertas",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "version-vulnerable-main",
+              "path": "/docs/version-vulnerable-main",
+              "sidebar": "tutorialSidebar"
+            }
+          ],
+          "draftIds": [],
+          "sidebars": {
+            "tutorialSidebar": {
+              "link": {
+                "path": "/docs/intro",
+                "label": "intro"
+              }
+            }
+          }
+        }
+      ],
+      "breadcrumbs": true
+    }
+  }
+}

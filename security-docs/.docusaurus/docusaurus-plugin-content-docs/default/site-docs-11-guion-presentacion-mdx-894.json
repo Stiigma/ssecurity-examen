@@ -1,0 +1,27 @@
+{
+  "id": "guion-presentacion",
+  "title": "Guion",
+  "description": "Duracion maxima: 30 minutos.",
+  "source": "@site/docs/11-guion-presentacion.mdx",
+  "sourceDirName": ".",
+  "slug": "/guion-presentacion",
+  "permalink": "/docs/guion-presentacion",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 12,
+  "frontMatter": {
+    "sidebar_position": 12,
+    "title": "Guion"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Endpoints",
+    "permalink": "/docs/endpoints"
+  },
+  "next": {
+    "title": "Mapa Canva",
+    "permalink": "/docs/canva-map"
+  }
+}

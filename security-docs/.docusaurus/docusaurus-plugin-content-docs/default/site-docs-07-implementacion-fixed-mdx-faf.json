@@ -1,0 +1,27 @@
+{
+  "id": "implementacion-fixed",
+  "title": "Implementacion fixed",
+  "description": "Esta seccion resume como se relleno la configuracion faltante para corregir A09.",
+  "source": "@site/docs/07-implementacion-fixed.mdx",
+  "sourceDirName": ".",
+  "slug": "/implementacion-fixed",
+  "permalink": "/docs/implementacion-fixed",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 8,
+  "frontMatter": {
+    "sidebar_position": 8,
+    "title": "Implementacion fixed"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Diseno fixed",
+    "permalink": "/docs/diseno-fixed"
+  },
+  "next": {
+    "title": "Reglas de alertas",
+    "permalink": "/docs/reglas-alertas"
+  }
+}

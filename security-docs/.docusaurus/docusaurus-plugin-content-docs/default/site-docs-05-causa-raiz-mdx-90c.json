@@ -1,0 +1,27 @@
+{
+  "id": "causa-raiz",
+  "title": "Causa raiz",
+  "description": "La vulnerabilidad aparece por una ausencia de diseño de observabilidad de seguridad.",
+  "source": "@site/docs/05-causa-raiz.mdx",
+  "sourceDirName": ".",
+  "slug": "/causa-raiz",
+  "permalink": "/docs/causa-raiz",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 6,
+  "frontMatter": {
+    "sidebar_position": 6,
+    "title": "Causa raiz"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Demo Red Team",
+    "permalink": "/docs/demo-red-team-main"
+  },
+  "next": {
+    "title": "Diseno fixed",
+    "permalink": "/docs/diseno-fixed"
+  }
+}

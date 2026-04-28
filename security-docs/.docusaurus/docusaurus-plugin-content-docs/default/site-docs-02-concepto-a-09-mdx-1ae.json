@@ -1,0 +1,27 @@
+{
+  "id": "concepto-a09",
+  "title": "Concepto A09",
+  "description": "A09 ocurre cuando una aplicacion no registra eventos de seguridad importantes, no genera alertas ante patrones sospechosos o registra datos inutiles para investigacion.",
+  "source": "@site/docs/02-concepto-a09.mdx",
+  "sourceDirName": ".",
+  "slug": "/concepto-a09",
+  "permalink": "/docs/concepto-a09",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 3,
+  "frontMatter": {
+    "sidebar_position": 3,
+    "title": "Concepto A09"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Contexto del examen",
+    "permalink": "/docs/contexto-examen"
+  },
+  "next": {
+    "title": "Version vulnerable",
+    "permalink": "/docs/version-vulnerable-main"
+  }
+}

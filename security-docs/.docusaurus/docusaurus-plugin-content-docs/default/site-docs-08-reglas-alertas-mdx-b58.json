@@ -1,0 +1,27 @@
+{
+  "id": "reglas-alertas",
+  "title": "Reglas de alertas",
+  "description": "El servicio SecurityAlertService evalua eventos y crea alertas internas en SQL Server.",
+  "source": "@site/docs/08-reglas-alertas.mdx",
+  "sourceDirName": ".",
+  "slug": "/reglas-alertas",
+  "permalink": "/docs/reglas-alertas",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 9,
+  "frontMatter": {
+    "sidebar_position": 9,
+    "title": "Reglas de alertas"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Implementacion fixed",
+    "permalink": "/docs/implementacion-fixed"
+  },
+  "next": {
+    "title": "Demo Blue Team",
+    "permalink": "/docs/demo-blue-team-fixed"
+  }
+}

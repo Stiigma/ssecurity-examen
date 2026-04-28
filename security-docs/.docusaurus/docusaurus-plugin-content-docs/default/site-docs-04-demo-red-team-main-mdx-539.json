@@ -1,0 +1,27 @@
+{
+  "id": "demo-red-team-main",
+  "title": "Demo Red Team",
+  "description": "Esta demo muestra que la version vulnerable responde a algunos ataques, pero no deja evidencia util.",
+  "source": "@site/docs/04-demo-red-team-main.mdx",
+  "sourceDirName": ".",
+  "slug": "/demo-red-team-main",
+  "permalink": "/docs/demo-red-team-main",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 5,
+  "frontMatter": {
+    "sidebar_position": 5,
+    "title": "Demo Red Team"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Version vulnerable",
+    "permalink": "/docs/version-vulnerable-main"
+  },
+  "next": {
+    "title": "Causa raiz",
+    "permalink": "/docs/causa-raiz"
+  }
+}
