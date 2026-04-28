@@ -1,0 +1,77 @@
+@baseUrl = http://localhost:5000
+@adminToken = REEMPLAZA_CON_TOKEN_ADMIN
+@studentToken = REEMPLAZA_CON_TOKEN_STUDENT1
+@auditorToken = REEMPLAZA_CON_TOKEN_AUDITOR
+
+### Health fixed
+GET {{baseUrl}}/api/demo/health
+
+### Escenarios corregidos
+GET {{baseUrl}}/api/demo/scenarios
+
+### Login admin
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@demo.local",
+  "password": "Admin123!"
+}
+
+### Login auditor
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "auditor@demo.local",
+  "password": "Auditor123!"
+}
+
+### Login student1
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "student1@demo.local",
+  "password": "Student123!"
+}
+
+### Repetir 5 veces para generar MultipleFailedLogins
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@demo.local",
+  "password": "PasswordIncorrecto123!"
+}
+
+### Alumno intenta endpoint admin
+GET {{baseUrl}}/api/admin/users
+Authorization: Bearer {{studentToken}}
+
+### Alumno intenta expediente ajeno. Repetir 2 veces para alerta StudentRecordProbing.
+GET {{baseUrl}}/api/student-records/by-user/20000000-0000-0000-0000-000000000002
+Authorization: Bearer {{studentToken}}
+
+### Crear ticket de seguridad
+POST {{baseUrl}}/api/support-tickets
+Authorization: Bearer {{studentToken}}
+Content-Type: application/json
+
+{
+  "subject": "Actividad sospechosa en mi cuenta",
+  "description": "Vi intentos de acceso que no reconozco y quiero que seguridad revise la actividad.",
+  "isSecurityRelevant": true
+}
+
+### Ver eventos
+GET {{baseUrl}}/api/security/events?page=1&pageSize=20
+Authorization: Bearer {{adminToken}}
+
+### Ver alertas abiertas
+GET {{baseUrl}}/api/security/alerts?onlyUnacknowledged=true
+Authorization: Bearer {{adminToken}}
+
+### Dashboard defensivo
+GET {{baseUrl}}/api/security/dashboard-summary
+Authorization: Bearer {{auditorToken}}

@@ -31,9 +31,6 @@ public sealed class StudentRecordsController(IStudentRecordService studentRecord
 
         if (response is null)
         {
-            // Vulnerable A09 demo:
-            // This may be a denied probing attempt against another student's record,
-            // but no event is persisted and no alert can be generated.
             return Forbid();
         }
 

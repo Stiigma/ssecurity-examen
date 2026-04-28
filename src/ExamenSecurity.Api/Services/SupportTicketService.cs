@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ExamenSecurity.Api.Services;
 
-public sealed class SupportTicketService(AppDbContext dbContext) : ISupportTicketService
+public sealed class SupportTicketService(AppDbContext dbContext, ISecurityAuditService securityAuditService) : ISupportTicketService
 {
     public async Task<SupportTicketResponse> CreateAsync(Guid userId, CreateSupportTicketRequest request, CancellationToken cancellationToken)
     {
@@ -22,9 +22,25 @@ public sealed class SupportTicketService(AppDbContext dbContext) : ISupportTicke
         dbContext.SupportTickets.Add(ticket);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        // Vulnerable A09 demo:
-        // Even when a user marks a ticket as security-relevant, the system does not create
-        // an alert, escalation, correlation id, or monitored security event.
+        if (ticket.IsSecurityRelevant)
+        {
+            await securityAuditService.AuditAsync(
+                new SecurityAuditRequest(
+                    SecurityEventType.SecurityTicketCreated,
+                    SecuritySeverity.Medium,
+                    "Accepted",
+                    "Usuario creo un ticket marcado como relevante para seguridad.",
+                    UserId: userId,
+                    StatusCode: StatusCodes.Status201Created,
+                    ResourceType: "SupportTicket",
+                    ResourceId: ticket.Id.ToString(),
+                    Metadata: new Dictionary<string, object?>
+                    {
+                        ["subject"] = ticket.Subject
+                    }),
+                cancellationToken);
+        }
+
         return Map(ticket);
     }
 

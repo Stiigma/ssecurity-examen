@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ExamenSecurity.Api.Services;
 
-public sealed class AdminService(AppDbContext dbContext) : IAdminService
+public sealed class AdminService(AppDbContext dbContext, ISecurityAuditService securityAuditService) : IAdminService
 {
     public async Task<IReadOnlyList<UserSummaryResponse>> GetUsersAsync(CancellationToken cancellationToken)
     {
@@ -17,7 +17,7 @@ public sealed class AdminService(AppDbContext dbContext) : IAdminService
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<UserSummaryResponse?> CreateUserAsync(CreateUserRequest request, CancellationToken cancellationToken)
+    public async Task<UserSummaryResponse?> CreateUserAsync(CreateUserRequest request, Guid changedByUserId, CancellationToken cancellationToken)
     {
         var role = request.Role.Trim();
         if (role is not (Roles.Admin or Roles.Student or Roles.Auditor))
@@ -39,9 +39,23 @@ public sealed class AdminService(AppDbContext dbContext) : IAdminService
         dbContext.Users.Add(user);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        // Vulnerable A09 demo:
-        // Creating a privileged or normal user is a sensitive administrative action,
-        // but this main branch has no audit trail that captures actor, target, reason, or timestamp.
+        await securityAuditService.AuditAsync(
+            new SecurityAuditRequest(
+                SecurityEventType.AdminUserCreated,
+                role == Roles.Admin ? SecuritySeverity.High : SecuritySeverity.Medium,
+                "Succeeded",
+                "Administrador creo un usuario.",
+                UserId: changedByUserId,
+                StatusCode: StatusCodes.Status201Created,
+                ResourceType: "User",
+                ResourceId: user.Id.ToString(),
+                Metadata: new Dictionary<string, object?>
+                {
+                    ["createdUserEmail"] = user.Email,
+                    ["createdUserRole"] = user.Role
+                }),
+            cancellationToken);
+
         return new UserSummaryResponse(user.Id, user.Email, user.FullName, user.Role, user.Department, user.IsEnabled);
     }
 
@@ -56,11 +70,22 @@ public sealed class AdminService(AppDbContext dbContext) : IAdminService
         user.IsEnabled = false;
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        // Vulnerable A09 demo:
-        // The reason and actor are received, but are not persisted in a security audit log.
-        // During an incident, the team cannot prove who disabled the account or why.
-        _ = request;
-        _ = changedByUserId;
+        await securityAuditService.AuditAsync(
+            new SecurityAuditRequest(
+                SecurityEventType.AdminUserDisabled,
+                SecuritySeverity.High,
+                "Succeeded",
+                "Administrador deshabilito un usuario.",
+                UserId: changedByUserId,
+                StatusCode: StatusCodes.Status200OK,
+                ResourceType: "User",
+                ResourceId: user.Id.ToString(),
+                Metadata: new Dictionary<string, object?>
+                {
+                    ["disabledUserEmail"] = user.Email,
+                    ["reason"] = request.Reason
+                }),
+            cancellationToken);
 
         return true;
     }
@@ -86,9 +111,22 @@ public sealed class AdminService(AppDbContext dbContext) : IAdminService
         client.DisabledAtUtc = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        // Vulnerable A09 demo:
-        // Disabling an integration is operationally sensitive, but no alert or admin audit entry is generated.
-        _ = changedByUserId;
+        await securityAuditService.AuditAsync(
+            new SecurityAuditRequest(
+                SecurityEventType.ApiClientDisabled,
+                SecuritySeverity.High,
+                "Succeeded",
+                "Administrador deshabilito un cliente de API.",
+                UserId: changedByUserId,
+                StatusCode: StatusCodes.Status200OK,
+                ResourceType: "ApiClient",
+                ResourceId: client.Id.ToString(),
+                Metadata: new Dictionary<string, object?>
+                {
+                    ["clientName"] = client.Name,
+                    ["ownerTeam"] = client.OwnerTeam
+                }),
+            cancellationToken);
 
         return new ApiClientResponse(client.Id, client.Name, client.OwnerTeam, client.IsEnabled, client.CreatedAtUtc, client.DisabledAtUtc);
     }
@@ -111,9 +149,24 @@ public sealed class AdminService(AppDbContext dbContext) : IAdminService
         dbContext.ConfigurationChanges.Add(change);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        // Vulnerable A09 demo:
-        // This stores the business change, but it is not treated as a security event,
-        // does not include request metadata, and does not alert on risky settings.
+        await securityAuditService.AuditAsync(
+            new SecurityAuditRequest(
+                SecurityEventType.ConfigurationChanged,
+                SecuritySeverity.High,
+                "Succeeded",
+                "Administrador modifico una configuracion sensible.",
+                UserId: changedByUserId,
+                StatusCode: StatusCodes.Status200OK,
+                ResourceType: "Configuration",
+                ResourceId: change.SettingKey,
+                Metadata: new Dictionary<string, object?>
+                {
+                    ["settingKey"] = change.SettingKey,
+                    ["previousValue"] = change.PreviousValue,
+                    ["newValue"] = change.NewValue
+                }),
+            cancellationToken);
+
         return new ConfigurationChangeResponse(
             change.Id,
             change.SettingKey,

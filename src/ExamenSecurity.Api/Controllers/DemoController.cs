@@ -16,8 +16,8 @@ public sealed class DemoController(IDemoScenarioService demoScenarioService) : C
         return Ok(new
         {
             status = "ok",
-            version = "main vulnerable",
-            warning = "Codigo vulnerable solo para laboratorio local. No usar en produccion."
+            version = "fixed",
+            warning = "Demo defensiva local para OWASP A09."
         });
     }
 
@@ -30,17 +30,17 @@ public sealed class DemoController(IDemoScenarioService demoScenarioService) : C
 
     [Authorize]
     [HttpGet("observability-summary")]
-    public ActionResult<VulnerableObservabilitySummaryResponse> GetObservabilitySummary()
+    public ActionResult<ObservabilitySummaryResponse> GetObservabilitySummary()
     {
-        return Ok(demoScenarioService.GetVulnerableSummary());
+        return Ok(demoScenarioService.GetObservabilitySummary());
     }
 
     [Authorize]
     [HttpGet("simulate-unhandled-error")]
     public IActionResult SimulateUnhandledError()
     {
-        // Vulnerable A09 demo:
-        // The error is not transformed into a security event with correlation id, user, path and request metadata.
-        throw new InvalidOperationException("Error simulado para demostrar ausencia de registro de seguridad durable.");
+        // Fixed A09 demo:
+        // The global exception middleware turns this into a durable security event with correlation id.
+        throw new InvalidOperationException("Error simulado para demostrar registro de seguridad durable.");
     }
 }

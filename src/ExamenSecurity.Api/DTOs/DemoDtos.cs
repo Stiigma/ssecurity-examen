@@ -5,10 +5,10 @@ public sealed record DemoScenarioResponse(
     string Title,
     string OwaspCategory,
     string WhatToDo,
-    string ExpectedVulnerableBehavior,
+    string ExpectedBehavior,
     string WhyItMatters);
 
-public sealed record VulnerableObservabilitySummaryResponse(
+public sealed record ObservabilitySummaryResponse(
     string Version,
     int PersistedSecurityEvents,
     int GeneratedSecurityAlerts,

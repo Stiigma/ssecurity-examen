@@ -5,5 +5,5 @@ namespace ExamenSecurity.Api.Services;
 public interface IDemoScenarioService
 {
     IReadOnlyList<DemoScenarioResponse> GetScenarios();
-    VulnerableObservabilitySummaryResponse GetVulnerableSummary();
+    ObservabilitySummaryResponse GetObservabilitySummary();
 }

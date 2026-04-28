@@ -1,11 +1,15 @@
 using ExamenSecurity.Api.Data;
 using ExamenSecurity.Api.DTOs;
+using ExamenSecurity.Api.Entities;
 using ExamenSecurity.Api.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExamenSecurity.Api.Services;
 
-public sealed class AuthService(AppDbContext dbContext, IJwtTokenService jwtTokenService) : IAuthService
+public sealed class AuthService(
+    AppDbContext dbContext,
+    IJwtTokenService jwtTokenService,
+    ISecurityAuditService securityAuditService) : IAuthService
 {
     public async Task<LoginResponse?> LoginAsync(LoginRequest request, CancellationToken cancellationToken)
     {
@@ -16,23 +20,50 @@ public sealed class AuthService(AppDbContext dbContext, IJwtTokenService jwtToke
 
         if (user is null)
         {
-            // Vulnerable A09 demo:
-            // Unknown account login attempts are rejected but not audited.
-            // A defender cannot see enumeration attempts or password spraying attempts.
+            await securityAuditService.AuditAsync(
+                new SecurityAuditRequest(
+                    SecurityEventType.LoginFailed,
+                    SecuritySeverity.Warning,
+                    "Rejected",
+                    "Intento de login con usuario inexistente o credenciales invalidas.",
+                    Username: normalizedEmail,
+                    StatusCode: StatusCodes.Status401Unauthorized),
+                cancellationToken);
+
             return null;
         }
 
         if (!user.IsEnabled)
         {
-            // Vulnerable A09 demo:
-            // Attempts against disabled accounts are security-relevant, but this version leaves no durable trace.
+            await securityAuditService.AuditAsync(
+                new SecurityAuditRequest(
+                    SecurityEventType.DisabledAccountLoginAttempt,
+                    SecuritySeverity.High,
+                    "Rejected",
+                    "Intento de autenticacion contra una cuenta deshabilitada.",
+                    UserId: user.Id,
+                    Username: user.Email,
+                    Role: user.Role,
+                    StatusCode: StatusCodes.Status401Unauthorized),
+                cancellationToken);
+
             return null;
         }
 
         if (!PasswordHasher.Verify(request.Password, user.PasswordHash))
         {
-            // Vulnerable A09 demo:
-            // Failed logins are not counted, correlated by IP/user, persisted, or alerted.
+            await securityAuditService.AuditAsync(
+                new SecurityAuditRequest(
+                    SecurityEventType.LoginFailed,
+                    SecuritySeverity.Warning,
+                    "Rejected",
+                    "Intento de login fallido por credenciales invalidas.",
+                    UserId: user.Id,
+                    Username: user.Email,
+                    Role: user.Role,
+                    StatusCode: StatusCodes.Status401Unauthorized),
+                cancellationToken);
+
             return null;
         }
 
@@ -40,6 +71,17 @@ public sealed class AuthService(AppDbContext dbContext, IJwtTokenService jwtToke
         await dbContext.SaveChangesAsync(cancellationToken);
 
         var token = jwtTokenService.CreateToken(user);
+        await securityAuditService.AuditAsync(
+            new SecurityAuditRequest(
+                SecurityEventType.LoginSucceeded,
+                SecuritySeverity.Info,
+                "Succeeded",
+                "Login exitoso.",
+                UserId: user.Id,
+                Username: user.Email,
+                Role: user.Role,
+                StatusCode: StatusCodes.Status200OK),
+            cancellationToken);
 
         return new LoginResponse(
             token.Token,
@@ -58,15 +100,29 @@ public sealed class AuthService(AppDbContext dbContext, IJwtTokenService jwtToke
             : new CurrentUserResponse(user.Id, user.Email, user.FullName, user.Role, user.Department, user.IsEnabled);
     }
 
-    public Task<PasswordResetResponse> RequestPasswordResetAsync(PasswordResetRequest request, CancellationToken cancellationToken)
+    public async Task<PasswordResetResponse> RequestPasswordResetAsync(PasswordResetRequest request, CancellationToken cancellationToken)
     {
-        // Vulnerable A09 demo:
-        // The response is intentionally generic, but the event is not audited. Repeated reset abuse
-        // cannot be detected later because there is no security event store or alert threshold.
+        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        var user = await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(
+            candidate => candidate.Email == normalizedEmail,
+            cancellationToken);
+
+        await securityAuditService.AuditAsync(
+            new SecurityAuditRequest(
+                SecurityEventType.PasswordResetRequested,
+                SecuritySeverity.Medium,
+                "Accepted",
+                "Solicitud de recuperacion de password recibida.",
+                UserId: user?.Id,
+                Username: normalizedEmail,
+                Role: user?.Role,
+                StatusCode: StatusCodes.Status200OK),
+            cancellationToken);
+
         var response = new PasswordResetResponse(
             "Si el correo existe, se enviaran instrucciones de recuperacion.",
-            "Version main vulnerable: la solicitud no queda auditada ni genera alerta por abuso repetido.");
+            "Version fixed: la solicitud queda registrada como evento de seguridad sin exponer si el correo existe.");
 
-        return Task.FromResult(response);
+        return response;
     }
 }

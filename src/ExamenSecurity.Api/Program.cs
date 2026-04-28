@@ -1,5 +1,7 @@
 using System.Text;
+using ExamenSecurity.Api;
 using ExamenSecurity.Api.Data;
+using ExamenSecurity.Api.Entities;
 using ExamenSecurity.Api.Options;
 using ExamenSecurity.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -10,6 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<CorsOptions>(builder.Configuration.GetSection(CorsOptions.SectionName));
@@ -26,6 +29,8 @@ builder.Services.AddScoped<IStudentRecordService, StudentRecordService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<ISupportTicketService, SupportTicketService>();
 builder.Services.AddScoped<IDemoScenarioService, DemoScenarioService>();
+builder.Services.AddScoped<ISecurityAuditService, SecurityAuditService>();
+builder.Services.AddScoped<ISecurityAlertService, SecurityAlertService>();
 
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("JWT configuration is missing.");
@@ -48,9 +53,56 @@ builder.Services
             ClockSkew = TimeSpan.FromMinutes(1)
         };
 
-        // Vulnerable A09 demo:
-        // Token failures are only rejected. They are not persisted as security events,
-        // not correlated with the request, and do not trigger alerts.
+        // Fixed A09 demo:
+        // Authentication and authorization failures now become durable security events.
+        options.Events = new JwtBearerEvents
+        {
+            OnAuthenticationFailed = async context =>
+            {
+                var auditService = context.HttpContext.RequestServices.GetRequiredService<ISecurityAuditService>();
+                await auditService.AuditAsync(
+                    new SecurityAuditRequest(
+                        SecurityEventType.TokenAuthenticationFailed,
+                        SecuritySeverity.Warning,
+                        "Rejected",
+                        "Token JWT invalido, expirado o no verificable.",
+                        StatusCode: StatusCodes.Status401Unauthorized,
+                        Metadata: new Dictionary<string, object?>
+                        {
+                            ["failureType"] = context.Exception.GetType().Name
+                        }),
+                    context.HttpContext.RequestAborted);
+            },
+            OnChallenge = async context =>
+            {
+                if (context.AuthenticateFailure is not null)
+                {
+                    return;
+                }
+
+                var auditService = context.HttpContext.RequestServices.GetRequiredService<ISecurityAuditService>();
+                await auditService.AuditAsync(
+                    new SecurityAuditRequest(
+                        SecurityEventType.UnauthorizedRequest,
+                        SecuritySeverity.Warning,
+                        "Rejected",
+                        "Solicitud sin autenticacion valida contra recurso protegido.",
+                        StatusCode: StatusCodes.Status401Unauthorized),
+                    context.HttpContext.RequestAborted);
+            },
+            OnForbidden = async context =>
+            {
+                var auditService = context.HttpContext.RequestServices.GetRequiredService<ISecurityAuditService>();
+                await auditService.AuditAsync(
+                    new SecurityAuditRequest(
+                        SecurityEventType.AccessDenied,
+                        SecuritySeverity.Warning,
+                        "Forbidden",
+                        "Usuario autenticado intento acceder a un recurso sin permisos suficientes.",
+                        StatusCode: StatusCodes.Status403Forbidden),
+                    context.HttpContext.RequestAborted);
+            }
+        };
     });
 
 builder.Services.AddAuthorization(options =>
@@ -78,6 +130,8 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseHttpsRedirection();
 app.UseCors("Frontend");
 app.UseAuthentication();

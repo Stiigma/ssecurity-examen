@@ -1,15 +1,35 @@
 using ExamenSecurity.Api.Data;
 using ExamenSecurity.Api.DTOs;
+using ExamenSecurity.Api.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExamenSecurity.Api.Services;
 
-public sealed class StudentRecordService(AppDbContext dbContext) : IStudentRecordService
+public sealed class StudentRecordService(AppDbContext dbContext, ISecurityAuditService securityAuditService) : IStudentRecordService
 {
     public async Task<StudentRecordResponse?> GetOwnRecordAsync(Guid userId, CancellationToken cancellationToken)
     {
-        return await ProjectRecord()
+        var record = await ProjectRecord()
             .FirstOrDefaultAsync(record => record.StudentUserId == userId, cancellationToken);
+
+        if (record is not null)
+        {
+            await securityAuditService.AuditAsync(
+                new SecurityAuditRequest(
+                    SecurityEventType.StudentRecordAccessed,
+                    SecuritySeverity.Info,
+                    "Succeeded",
+                    "Alumno consulto su propio expediente.",
+                    UserId: userId,
+                    Username: record.StudentEmail,
+                    Role: Roles.Student,
+                    StatusCode: StatusCodes.Status200OK,
+                    ResourceType: "StudentRecord",
+                    ResourceId: record.Id.ToString()),
+                cancellationToken);
+        }
+
+        return record;
     }
 
     public async Task<StudentRecordResponse?> GetRecordForUserAsync(
@@ -20,14 +40,49 @@ public sealed class StudentRecordService(AppDbContext dbContext) : IStudentRecor
     {
         if (!isAdmin && requestedStudentUserId != currentUserId)
         {
-            // Vulnerable A09 demo:
-            // The access attempt is correctly denied, but the system does not record who tried
-            // to access another student's record, which endpoint was used, or how often it happened.
+            await securityAuditService.AuditAsync(
+                new SecurityAuditRequest(
+                    SecurityEventType.StudentRecordAccessDenied,
+                    SecuritySeverity.High,
+                    "Forbidden",
+                    "Usuario intento consultar el expediente academico de otro alumno.",
+                    UserId: currentUserId,
+                    StatusCode: StatusCodes.Status403Forbidden,
+                    ResourceType: "StudentUser",
+                    ResourceId: requestedStudentUserId.ToString(),
+                    Metadata: new Dictionary<string, object?>
+                    {
+                        ["requestedStudentUserId"] = requestedStudentUserId
+                    }),
+                cancellationToken);
+
             return null;
         }
 
-        return await ProjectRecord()
+        var record = await ProjectRecord()
             .FirstOrDefaultAsync(record => record.StudentUserId == requestedStudentUserId, cancellationToken);
+
+        if (record is not null)
+        {
+            await securityAuditService.AuditAsync(
+                new SecurityAuditRequest(
+                    SecurityEventType.StudentRecordAccessed,
+                    SecuritySeverity.Info,
+                    "Succeeded",
+                    "Expediente academico consultado por usuario autorizado.",
+                    UserId: currentUserId,
+                    StatusCode: StatusCodes.Status200OK,
+                    ResourceType: "StudentRecord",
+                    ResourceId: record.Id.ToString(),
+                    Metadata: new Dictionary<string, object?>
+                    {
+                        ["studentUserId"] = record.StudentUserId,
+                        ["accessMode"] = isAdmin ? "Admin" : "Owner"
+                    }),
+                cancellationToken);
+        }
+
+        return record;
     }
 
     private IQueryable<StudentRecordResponse> ProjectRecord()

@@ -17,12 +17,10 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
         var response = await authService.LoginAsync(request, cancellationToken);
         if (response is null)
         {
-            // Vulnerable A09 demo:
-            // A failed authentication event is security-relevant, but this endpoint only returns 401.
             return Unauthorized(new
             {
                 message = "Credenciales invalidas.",
-                a09 = "Version main vulnerable: no se registro evento de login fallido ni se genero alerta."
+                a09 = "Version fixed: el intento fallido quedo registrado como evento de seguridad."
             });
         }
 

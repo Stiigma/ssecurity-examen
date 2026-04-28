@@ -21,7 +21,7 @@ public sealed class AdminController(IAdminService adminService) : ControllerBase
     [HttpPost("users")]
     public async Task<ActionResult<UserSummaryResponse>> CreateUser(CreateUserRequest request, CancellationToken cancellationToken)
     {
-        var response = await adminService.CreateUserAsync(request, cancellationToken);
+        var response = await adminService.CreateUserAsync(request, User.GetUserId(), cancellationToken);
         if (response is null)
         {
             return BadRequest(new { message = "Rol invalido para la demo." });
@@ -42,7 +42,7 @@ public sealed class AdminController(IAdminService adminService) : ControllerBase
         return Ok(new
         {
             message = "Usuario deshabilitado.",
-            a09 = "Version main vulnerable: accion administrativa ejecutada sin auditoria de seguridad."
+            a09 = "Version fixed: accion administrativa registrada y evaluada para alerta."
         });
     }
 

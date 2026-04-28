@@ -10,6 +10,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<SupportTicket> SupportTickets => Set<SupportTicket>();
     public DbSet<ConfigurationChange> ConfigurationChanges => Set<ConfigurationChange>();
     public DbSet<ApiClient> ApiClients => Set<ApiClient>();
+    public DbSet<SecurityEvent> SecurityEvents => Set<SecurityEvent>();
+    public DbSet<SecurityAlert> SecurityAlerts => Set<SecurityAlert>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -70,6 +72,56 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasKey(client => client.Id);
             entity.Property(client => client.Name).HasMaxLength(160).IsRequired();
             entity.Property(client => client.OwnerTeam).HasMaxLength(120).IsRequired();
+        });
+
+        modelBuilder.Entity<SecurityEvent>(entity =>
+        {
+            entity.HasKey(securityEvent => securityEvent.Id);
+            entity.HasIndex(securityEvent => securityEvent.CreatedAtUtc);
+            entity.HasIndex(securityEvent => securityEvent.EventType);
+            entity.HasIndex(securityEvent => securityEvent.Severity);
+            entity.HasIndex(securityEvent => securityEvent.Username);
+            entity.HasIndex(securityEvent => securityEvent.IpAddress);
+            entity.Property(securityEvent => securityEvent.EventType).HasConversion<string>().HasMaxLength(80).IsRequired();
+            entity.Property(securityEvent => securityEvent.Severity).HasConversion<string>().HasMaxLength(40).IsRequired();
+            entity.Property(securityEvent => securityEvent.Username).HasMaxLength(256);
+            entity.Property(securityEvent => securityEvent.Role).HasMaxLength(40);
+            entity.Property(securityEvent => securityEvent.IpAddress).HasMaxLength(64);
+            entity.Property(securityEvent => securityEvent.UserAgent).HasMaxLength(512);
+            entity.Property(securityEvent => securityEvent.HttpMethod).HasMaxLength(16);
+            entity.Property(securityEvent => securityEvent.Path).HasMaxLength(512);
+            entity.Property(securityEvent => securityEvent.ResourceType).HasMaxLength(120);
+            entity.Property(securityEvent => securityEvent.ResourceId).HasMaxLength(120);
+            entity.Property(securityEvent => securityEvent.Outcome).HasMaxLength(80).IsRequired();
+            entity.Property(securityEvent => securityEvent.Message).HasMaxLength(1000).IsRequired();
+            entity.Property(securityEvent => securityEvent.MetadataJson).HasMaxLength(4000);
+            entity.Property(securityEvent => securityEvent.CorrelationId).HasMaxLength(80).IsRequired();
+            entity.HasOne(securityEvent => securityEvent.User)
+                .WithMany()
+                .HasForeignKey(securityEvent => securityEvent.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<SecurityAlert>(entity =>
+        {
+            entity.HasKey(alert => alert.Id);
+            entity.HasIndex(alert => alert.CreatedAtUtc);
+            entity.HasIndex(alert => alert.AlertType);
+            entity.HasIndex(alert => alert.IsAcknowledged);
+            entity.Property(alert => alert.AlertType).HasConversion<string>().HasMaxLength(80).IsRequired();
+            entity.Property(alert => alert.Severity).HasConversion<string>().HasMaxLength(40).IsRequired();
+            entity.Property(alert => alert.Title).HasMaxLength(200).IsRequired();
+            entity.Property(alert => alert.Description).HasMaxLength(1000).IsRequired();
+            entity.Property(alert => alert.RelatedUsername).HasMaxLength(256);
+            entity.Property(alert => alert.RelatedIpAddress).HasMaxLength(64);
+            entity.HasOne(alert => alert.RelatedUser)
+                .WithMany()
+                .HasForeignKey(alert => alert.RelatedUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(alert => alert.AcknowledgedByUser)
+                .WithMany()
+                .HasForeignKey(alert => alert.AcknowledgedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }
