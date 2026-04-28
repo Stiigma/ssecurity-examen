@@ -1,0 +1,131 @@
+@baseUrl = http://localhost:5000
+
+# This file uses VS Code REST Client-style named request variables.
+# If your HTTP client does not support them, copy accessToken from the login
+# responses and paste it into each Authorization header manually.
+
+### Health check
+GET {{baseUrl}}/api/demo/health
+
+### List A09 demo scenarios
+GET {{baseUrl}}/api/demo/scenarios
+
+### Failed login 1
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@demo.local",
+  "password": "WrongPassword123!"
+}
+
+### Failed login 2
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@demo.local",
+  "password": "WrongPassword123!"
+}
+
+### Failed login 3
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@demo.local",
+  "password": "WrongPassword123!"
+}
+
+### Failed login 4
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@demo.local",
+  "password": "WrongPassword123!"
+}
+
+### Failed login 5
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@demo.local",
+  "password": "WrongPassword123!"
+}
+
+### Login as admin
+# @name adminLogin
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@demo.local",
+  "password": "Admin123!"
+}
+
+### Vulnerable observability summary
+GET {{baseUrl}}/api/demo/observability-summary
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
+
+### Security events are empty in the vulnerable branch
+GET {{baseUrl}}/api/security/events
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
+
+### Security alerts are empty in the vulnerable branch
+GET {{baseUrl}}/api/security/alerts
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
+
+### Login as student
+# @name studentLogin
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "student1@demo.local",
+  "password": "Student123!"
+}
+
+### Student attempts to access admin users
+# Expected vulnerable behavior: 403, but no durable security event.
+GET {{baseUrl}}/api/admin/users
+Authorization: Bearer {{studentLogin.response.body.$.accessToken}}
+
+### Student attempts to access another student's record
+# Expected vulnerable behavior: 403, but no durable security event.
+GET {{baseUrl}}/api/student-records/by-user/20000000-0000-0000-0000-000000000002
+Authorization: Bearer {{studentLogin.response.body.$.accessToken}}
+
+### Student creates a security-relevant support ticket
+# Expected vulnerable behavior: ticket is stored, but no security alert is generated.
+POST {{baseUrl}}/api/support-tickets
+Authorization: Bearer {{studentLogin.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "subject": "Someone tried to access my account",
+  "description": "I saw suspicious activity, but the system has no security event history for me to review.",
+  "isSecurityRelevant": true
+}
+
+### Admin disables a user
+# Expected vulnerable behavior: action succeeds, but no security audit trail is created.
+POST {{baseUrl}}/api/admin/users/20000000-0000-0000-0000-000000000003/disable
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "reason": "Class demo of sensitive admin action without security audit."
+}
+
+### Admin changes configuration
+# Expected vulnerable behavior: business change is stored, but no alert is generated.
+POST {{baseUrl}}/api/admin/configuration
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "settingKey": "Security.Logging.Enabled",
+  "newValue": "false"
+}
