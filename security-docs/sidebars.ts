@@ -32,6 +32,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'diseno-fixed',
         'implementacion-fixed',
+        'recorrido-codigo-main-fixed',
         'reglas-alertas',
         'demo-blue-team-fixed',
       ],

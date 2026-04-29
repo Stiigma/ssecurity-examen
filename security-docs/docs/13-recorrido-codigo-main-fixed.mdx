@@ -1,0 +1,418 @@
+---
+sidebar_position: 13
+title: Recorrido main a fixed
+---
+
+# Recorrido del codigo: de `master` a `fixed`
+
+Este apartado sirve para explicar la evolucion del proyecto durante la presentacion. La idea no es leer todos los archivos, sino contar una historia tecnica clara:
+
+```text
+master bloquea algunas acciones
+  -> pero no deja evidencia defensiva
+  -> fixed agrega eventos, correlacion, alertas e investigacion
+```
+
+## 1. Como comparar las ramas
+
+Antes de explicar la solucion, conviene mostrar que existen dos estados del codigo:
+
+```bash
+git branch --all
+git diff --stat master..fixed
+git diff --name-status master..fixed -- src/ExamenSecurity.Api
+```
+
+Lectura esperada:
+
+- `master` representa la version vulnerable de laboratorio.
+- `fixed` representa la version corregida.
+- La correccion no solo cambia respuestas HTTP; agrega una capacidad defensiva completa.
+
+:::tip Frase para exposicion
+No arreglamos A09 cambiando un `401` por otro mensaje. Lo arreglamos creando evidencia util para detectar, investigar y responder.
+:::
+
+## 2. Punto de partida en `master`
+
+En `master` ya existian controles basicos:
+
+| Flujo | Que hacia `master` | Limite defensivo |
+|---|---|---|
+| Login incorrecto | Devolvia `401` | No registraba `LoginFailed` |
+| Cuenta deshabilitada | Rechazaba el acceso | No dejaba evidencia de intento contra cuenta sensible |
+| Alumno contra endpoint admin | Devolvia `403` | No registraba sondeo administrativo |
+| Alumno contra expediente ajeno | Devolvia `403` | No registraba intento contra datos privados |
+| Ticket marcado como seguridad | Guardaba ticket | No generaba alerta |
+| Error no controlado | Fallaba la request | No habia evento correlacionable |
+
+El punto importante es que `master` si podia negar algunas acciones, pero no podia explicar despues que paso.
+
+## 3. Causa raiz
+
+La causa raiz fue una ausencia de responsabilidad en la arquitectura:
+
+```text
+Control de acceso existe
+Observabilidad defensiva no existe
+```
+
+Por eso, el problema no estaba en una sola linea. Estaba en que no habia:
+
+- Entidades para eventos de seguridad.
+- Entidades para alertas.
+- Servicio central de auditoria.
+- Middleware de `CorrelationId`.
+- Captura global de excepciones como eventos.
+- Eventos de JWT para `401` y `403`.
+- Endpoints reales para investigar eventos y alertas.
+
+## 4. Decision de diseno en `fixed`
+
+La solucion se penso como un pipeline defensivo:
+
+```text
+Request
+  -> validacion/autorizacion normal
+  -> SecurityAuditService
+  -> SecurityEvents en SQL Server
+  -> SecurityAlertService
+  -> SecurityAlerts en SQL Server
+  -> API de investigacion para Admin/Auditor
+```
+
+La decision principal fue separar dos conceptos:
+
+| Concepto | Proposito |
+|---|---|
+| `SecurityEvent` | Evidencia atomica de algo relevante que paso |
+| `SecurityAlert` | Senal operativa cuando un evento o patron necesita revision |
+
+Esto evita tratar todo como alerta. Un login fallido aislado puede ser error humano; cinco fallos en 10 minutos ya pueden indicar password spraying o fuerza bruta.
+
+## 5. Paso 1: crear el modelo de evidencia
+
+Archivos agregados:
+
+- `src/ExamenSecurity.Api/Entities/SecurityEvent.cs`
+- `src/ExamenSecurity.Api/Entities/SecurityAlert.cs`
+- `src/ExamenSecurity.Api/Entities/SecurityEventType.cs`
+- `src/ExamenSecurity.Api/Entities/SecurityAlertType.cs`
+- `src/ExamenSecurity.Api/Entities/SecuritySeverity.cs`
+
+Que soluciona:
+
+- Permite persistir eventos con actor, recurso, resultado, severidad y tiempo.
+- Permite separar eventos informativos de eventos criticos.
+- Permite consultar historico despues de una demo o incidente.
+
+Por que se penso asi:
+
+- A09 no se corrige solo con logs de consola.
+- La evidencia debe quedar en almacenamiento durable.
+- El equipo Blue Team necesita filtrar por tipo, severidad, usuario, IP y fecha.
+
+## 6. Paso 2: registrar tablas e indices
+
+Archivo: `src/ExamenSecurity.Api/Data/AppDbContext.cs`.
+
+En `fixed` se agregaron los `DbSet`:
+
+```csharp
+public DbSet<SecurityEvent> SecurityEvents => Set<SecurityEvent>();
+public DbSet<SecurityAlert> SecurityAlerts => Set<SecurityAlert>();
+```
+
+Tambien se configuraron indices por campos de investigacion:
+
+- `CreatedAtUtc`.
+- `EventType`.
+- `Severity`.
+- `Username`.
+- `IpAddress`.
+- `IsAcknowledged` para alertas.
+
+Que soluciona:
+
+- Consultas rapidas para revisar actividad reciente.
+- Filtros utiles para una investigacion.
+- Persistencia consistente en SQL Server.
+
+Por que se penso asi:
+
+- En seguridad casi siempre se pregunta: quien, cuando, desde donde, que recurso y con que resultado.
+- Esos campos debian ser consultables sin revisar texto libre.
+
+## 7. Paso 3: crear `SecurityAuditService`
+
+Archivo: `src/ExamenSecurity.Api/Services/SecurityAuditService.cs`.
+
+Este servicio concentra la auditoria para que cada modulo no tenga que repetir la misma logica.
+
+Responsabilidades:
+
+- Crear un `SecurityEvent`.
+- Enriquecerlo con datos HTTP.
+- Tomar usuario y rol desde claims cuando sea posible.
+- Capturar IP, `User-Agent`, metodo, ruta y status.
+- Asociar `CorrelationId`.
+- Sanitizar metadata sensible.
+- Guardar en base de datos.
+- Enviar el evento al motor de alertas.
+
+Ejemplo conceptual:
+
+```text
+AuditAsync(LoginFailed)
+  -> agrega IP, path, usuario, correlationId
+  -> guarda SecurityEvent
+  -> evalua reglas de alerta
+```
+
+Que soluciona:
+
+- Evita auditoria duplicada o inconsistente.
+- Asegura que todos los eventos tengan el mismo formato.
+- Reduce el riesgo de guardar passwords, tokens o secretos en metadata.
+
+Por que se penso asi:
+
+- La auditoria es una preocupacion transversal.
+- Si cada controlador inventa su propio log, la evidencia queda incompleta.
+
+## 8. Paso 4: agregar correlacion y manejo global de errores
+
+Archivos:
+
+- `src/ExamenSecurity.Api/Middleware/CorrelationIdMiddleware.cs`
+- `src/ExamenSecurity.Api/Middleware/GlobalExceptionMiddleware.cs`
+- `src/ExamenSecurity.Api/Program.cs`
+
+En `Program.cs` se agrego:
+
+```csharp
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<GlobalExceptionMiddleware>();
+```
+
+Que soluciona:
+
+- Cada request puede conectarse con sus eventos usando `X-Correlation-ID`.
+- Los errores no controlados se convierten en eventos `UnhandledException`.
+- El cliente no recibe detalles internos innecesarios.
+
+Por que se penso asi:
+
+- En una investigacion no basta saber que hubo un error.
+- Hay que poder unir request, respuesta, evento y alerta.
+
+## 9. Paso 5: auditar autenticacion y autorizacion
+
+Archivos:
+
+- `src/ExamenSecurity.Api/Program.cs`
+- `src/ExamenSecurity.Api/Services/AuthService.cs`
+
+En `master`, un login fallido terminaba en `return null`. En `fixed`, antes de regresar se crea un evento:
+
+```csharp
+await securityAuditService.AuditAsync(
+    new SecurityAuditRequest(
+        SecurityEventType.LoginFailed,
+        SecuritySeverity.Warning,
+        "Rejected",
+        "Intento de login fallido por credenciales invalidas.",
+        StatusCode: StatusCodes.Status401Unauthorized),
+    cancellationToken);
+```
+
+Tambien se agregaron eventos para:
+
+- `LoginSucceeded`.
+- `DisabledAccountLoginAttempt`.
+- `PasswordResetRequested`.
+- `TokenAuthenticationFailed`.
+- `UnauthorizedRequest`.
+- `AccessDenied`.
+
+Que soluciona:
+
+- Permite detectar fuerza bruta, password spraying y abuso de recuperacion de password.
+- Permite saber cuando un usuario autenticado intenta recursos no permitidos.
+- Permite investigar tokens invalidos o expirados usados contra la API.
+
+Por que se penso asi:
+
+- Los `401` y `403` son respuestas para el cliente.
+- Los eventos son evidencia para el equipo defensor.
+- Ambas cosas son necesarias.
+
+## 10. Paso 6: auditar acceso a expedientes
+
+Archivo: `src/ExamenSecurity.Api/Services/StudentRecordService.cs`.
+
+En `master`, un alumno que intentaba consultar el expediente de otro alumno recibia `403`, pero no quedaba registro.
+
+En `fixed`, ese intento genera:
+
+```text
+StudentRecordAccessDenied
+Severity: High
+ResourceType: StudentUser
+ResourceId: usuario solicitado
+```
+
+Que soluciona:
+
+- Detecta sondeo de datos academicos sensibles.
+- Permite saber que usuario intento consultar que expediente.
+- Permite alertar cuando el patron se repite.
+
+Por que se penso asi:
+
+- El expediente academico es informacion sensible.
+- Un acceso bloqueado tambien puede ser intento de abuso.
+
+## 11. Paso 7: auditar acciones administrativas
+
+Archivo: `src/ExamenSecurity.Api/Services/AdminService.cs`.
+
+Eventos agregados:
+
+| Accion | Evento |
+|---|---|
+| Crear usuario | `AdminUserCreated` |
+| Deshabilitar usuario | `AdminUserDisabled` |
+| Deshabilitar cliente API | `ApiClientDisabled` |
+| Cambiar configuracion sensible | `ConfigurationChanged` |
+
+Que soluciona:
+
+- Responde quien hizo una accion sensible.
+- Guarda el recurso afectado.
+- Permite alertar cambios administrativos de alto impacto.
+
+Por que se penso asi:
+
+- Las acciones admin pueden ser normales, error humano o actividad maliciosa.
+- Sin auditoria, no hay forma confiable de distinguirlas despues.
+
+## 12. Paso 8: convertir tickets de seguridad en alertas
+
+Archivo: `src/ExamenSecurity.Api/Services/SupportTicketService.cs`.
+
+En `master`, un ticket con `isSecurityRelevant=true` se guardaba como ticket normal.
+
+En `fixed`, si el ticket es relevante para seguridad:
+
+```text
+SecurityTicketCreated
+  -> SecurityTicketRequiresReview
+```
+
+Que soluciona:
+
+- Evita que una senal humana de incidente quede perdida como soporte comun.
+- Crea una alerta interna para revision.
+
+Por que se penso asi:
+
+- No toda deteccion viene de automatizacion.
+- Un reporte de usuario tambien puede ser una senal de seguridad.
+
+## 13. Paso 9: crear reglas de alertamiento
+
+Archivo: `src/ExamenSecurity.Api/Services/SecurityAlertService.cs`.
+
+Reglas principales:
+
+| Evento o patron | Alerta | Razon |
+|---|---|---|
+| 5 `LoginFailed` en 10 minutos | `MultipleFailedLogins` | Posible fuerza bruta o password spraying |
+| 2 intentos contra cuenta deshabilitada | `DisabledAccountTargeted` | Cuenta sensible bajo intento de acceso |
+| 3 `AccessDenied` contra `/api/admin` | `AdminEndpointProbing` | Sondeo administrativo |
+| 2 intentos de expediente ajeno | `StudentRecordProbing` | Abuso contra datos academicos |
+| Cambio admin sensible | `SensitiveAdminChange` | Accion de alto impacto |
+| Ticket de seguridad | `SecurityTicketRequiresReview` | Senal humana que requiere atencion |
+| 3 errores no controlados por endpoint | `RepeatedUnhandledErrors` | Posible abuso o falla explotable |
+
+Que soluciona:
+
+- Evita depender de revision manual de cada evento.
+- Convierte patrones sospechosos en alertas accionables.
+- Mantiene la demo reproducible sin correo, Slack o servicios externos.
+
+Por que se penso asi:
+
+- Para el examen, lo importante es demostrar deteccion y respuesta local.
+- Las notificaciones externas se pueden agregar despues, pero la base defensiva debe funcionar sin internet ni credenciales externas.
+
+## 14. Paso 10: exponer endpoints de investigacion
+
+Archivo: `src/ExamenSecurity.Api/Controllers/SecurityController.cs`.
+
+En `master`, los endpoints devolvian arreglos vacios con mensajes de vulnerabilidad.
+
+En `fixed`, el controlador permite:
+
+- Consultar eventos con filtros.
+- Consultar un evento por ID.
+- Consultar alertas abiertas o filtradas.
+- Reconocer una alerta.
+- Ver resumen defensivo en dashboard.
+- Ver readiness de observabilidad.
+
+Endpoints clave:
+
+```http
+GET /api/security/events
+GET /api/security/alerts?onlyUnacknowledged=true
+POST /api/security/alerts/{id}/acknowledge
+GET /api/security/dashboard-summary
+GET /api/security/observability-readiness
+```
+
+Que soluciona:
+
+- La evidencia ya no queda escondida en la base de datos.
+- Admin y Auditor pueden investigar desde la API.
+- La demo puede comprobar la correccion con requests HTTP.
+
+## 15. Como explicar la diferencia final
+
+La comparativa que resume todo:
+
+| Pregunta defensiva | `master` | `fixed` |
+|---|---|---|
+| Quien intento entrar? | No siempre se sabe | `Username`, `UserId`, `Role` |
+| Desde donde vino? | No queda trazado | `IpAddress`, `UserAgent` |
+| Que endpoint uso? | No queda trazado | `HttpMethod`, `Path` |
+| Que recurso intento tocar? | No queda trazado | `ResourceType`, `ResourceId` |
+| Que paso? | Solo respuesta HTTP | `Outcome`, `StatusCode`, `Message` |
+| Como conecto eventos? | No hay correlacion | `CorrelationId` |
+| Cuando debo actuar? | No hay alerta | `SecurityAlert` |
+
+Mensaje final:
+
+```text
+master protege parcialmente recursos, pero no observa.
+fixed protege y observa: registra, correlaciona, alerta e investiga.
+```
+
+## 16. Guion corto para explicar el cambio
+
+1. Mostrar `master`: login fallido, acceso admin denegado y expediente ajeno devuelven `401/403`.
+2. Explicar el problema: las respuestas son correctas para el cliente, pero inutiles para investigar si no quedan eventos.
+3. Mostrar la causa raiz: no existia un servicio central de auditoria ni entidades de eventos/alertas.
+4. Cambiar a `fixed`: repetir las mismas acciones.
+5. Mostrar `SecurityEvents`: ahora existe evidencia con usuario, IP, ruta, recurso, severidad y correlation ID.
+6. Mostrar `SecurityAlerts`: los patrones repetidos generan alertas.
+7. Cerrar con la idea: A09 se corrige cuando la aplicacion puede detectar e investigar, no solo bloquear.
+
+:::tip CANVA - Slide nueva
+Titulo sugerido: **Del bloqueo silencioso a la evidencia accionable**
+
+Visual:
+
+`401/403 silencioso -> SecurityEvent -> SecurityAlert -> Investigacion`
+:::
