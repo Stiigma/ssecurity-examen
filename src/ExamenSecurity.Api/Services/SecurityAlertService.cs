@@ -1,10 +1,16 @@
 using ExamenSecurity.Api.Data;
 using ExamenSecurity.Api.Entities;
+using ExamenSecurity.Api.Options;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace ExamenSecurity.Api.Services;
 
-public sealed class SecurityAlertService(AppDbContext dbContext) : ISecurityAlertService
+public sealed class SecurityAlertService(
+    AppDbContext dbContext,
+    IServiceProvider serviceProvider,
+    IOptions<AccountLockoutOptions> lockoutOptions,
+    ILogger<SecurityAlertService> logger) : ISecurityAlertService
 {
     private static readonly TimeSpan DetectionWindow = TimeSpan.FromMinutes(10);
 
@@ -49,6 +55,19 @@ public sealed class SecurityAlertService(AppDbContext dbContext) : ISecurityAler
             case SecurityEventType.UnhandledException:
                 await EvaluateRepeatedUnhandledErrorsAsync(securityEvent, cancellationToken);
                 break;
+            case SecurityEventType.HoneytokenTriggered:
+                await CreateHoneytokenAlertAsync(securityEvent, cancellationToken);
+                break;
+            case SecurityEventType.ImpossibleTravelDetected:
+                await CreateAlertIfMissingAsync(
+                    SecurityAlertType.ImpossibleTravel,
+                    SecuritySeverity.High,
+                    "Viaje imposible detectado",
+                    securityEvent.Message,
+                    securityEvent,
+                    1,
+                    cancellationToken);
+                break;
         }
     }
 
@@ -85,7 +104,7 @@ public sealed class SecurityAlertService(AppDbContext dbContext) : ISecurityAler
 
         if (count >= 5)
         {
-            await CreateAlertIfMissingAsync(
+            var alert = await CreateAlertIfMissingAsync(
                 SecurityAlertType.MultipleFailedLogins,
                 SecuritySeverity.High,
                 "Multiples intentos fallidos de login",
@@ -93,6 +112,11 @@ public sealed class SecurityAlertService(AppDbContext dbContext) : ISecurityAler
                 securityEvent,
                 count,
                 cancellationToken);
+
+            if (alert is not null)
+            {
+                await TriggerLockoutsAsync(securityEvent, alert, cancellationToken);
+            }
         }
     }
 
@@ -110,7 +134,7 @@ public sealed class SecurityAlertService(AppDbContext dbContext) : ISecurityAler
 
         if (count >= 2)
         {
-            await CreateAlertIfMissingAsync(
+            var alert = await CreateAlertIfMissingAsync(
                 SecurityAlertType.DisabledAccountTargeted,
                 SecuritySeverity.High,
                 "Cuenta deshabilitada bajo intento de acceso",
@@ -118,6 +142,11 @@ public sealed class SecurityAlertService(AppDbContext dbContext) : ISecurityAler
                 securityEvent,
                 count,
                 cancellationToken);
+
+            if (alert is not null)
+            {
+                await TriggerLockoutsAsync(securityEvent, alert, cancellationToken);
+            }
         }
     }
 
@@ -206,7 +235,28 @@ public sealed class SecurityAlertService(AppDbContext dbContext) : ISecurityAler
         }
     }
 
-    private async Task CreateAlertIfMissingAsync(
+    private async Task CreateHoneytokenAlertAsync(SecurityEvent securityEvent, CancellationToken cancellationToken)
+    {
+        // Honeytoken alerts are ALWAYS created immediately, without deduplication or time windows.
+        var alert = new SecurityAlert
+        {
+            Id = Guid.NewGuid(),
+            AlertType = SecurityAlertType.HoneytokenAccessed,
+            Severity = SecuritySeverity.Critical,
+            Title = "Endpoint senoelo (honeytoken) accedido",
+            Description = $"Sondeo detectado en {securityEvent.Path} desde {securityEvent.IpAddress}.",
+            RelatedUserId = securityEvent.UserId,
+            RelatedUsername = securityEvent.Username,
+            RelatedIpAddress = securityEvent.IpAddress,
+            EventCount = 1,
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        };
+
+        dbContext.SecurityAlerts.Add(alert);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<SecurityAlert?> CreateAlertIfMissingAsync(
         SecurityAlertType alertType,
         SecuritySeverity severity,
         string title,
@@ -226,10 +276,10 @@ public sealed class SecurityAlertService(AppDbContext dbContext) : ISecurityAler
 
         if (alreadyExists)
         {
-            return;
+            return null;
         }
 
-        dbContext.SecurityAlerts.Add(new SecurityAlert
+        var alert = new SecurityAlert
         {
             Id = Guid.NewGuid(),
             AlertType = alertType,
@@ -241,8 +291,73 @@ public sealed class SecurityAlertService(AppDbContext dbContext) : ISecurityAler
             RelatedIpAddress = securityEvent.IpAddress,
             EventCount = eventCount,
             CreatedAtUtc = DateTimeOffset.UtcNow
-        });
+        };
 
+        dbContext.SecurityAlerts.Add(alert);
         await dbContext.SaveChangesAsync(cancellationToken);
+        return alert;
+    }
+
+    private async Task TriggerLockoutsAsync(SecurityEvent securityEvent, SecurityAlert alert, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var options = lockoutOptions.Value;
+            if (!options.Enabled)
+            {
+                return;
+            }
+
+            var duration = await CalculateLockoutDurationAsync(securityEvent, cancellationToken);
+            var lockoutService = serviceProvider.GetRequiredService<IAccountLockoutService>();
+
+            if (options.LockUserAccount && !string.IsNullOrWhiteSpace(securityEvent.Username))
+            {
+                await lockoutService.LockAsync(
+                    LockoutTargetType.User,
+                    securityEvent.Username,
+                    duration,
+                    $"Alerta {alert.AlertType}: {alert.Description}",
+                    alert.Id,
+                    cancellationToken);
+            }
+
+            if (options.LockIpAddress && !string.IsNullOrWhiteSpace(securityEvent.IpAddress))
+            {
+                await lockoutService.LockAsync(
+                    LockoutTargetType.IpAddress,
+                    securityEvent.IpAddress,
+                    duration,
+                    $"Alerta {alert.AlertType}: {alert.Description}",
+                    alert.Id,
+                    cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to trigger lockout for alert {AlertId}.", alert.Id);
+        }
+    }
+
+    private async Task<TimeSpan> CalculateLockoutDurationAsync(SecurityEvent securityEvent, CancellationToken cancellationToken)
+    {
+        var baseDuration = TimeSpan.FromMinutes(lockoutOptions.Value.BaseDurationMinutes);
+        var username = securityEvent.Username;
+        var ipAddress = securityEvent.IpAddress;
+
+        var previousLockouts = await dbContext.AccountLockouts
+            .AsNoTracking()
+            .CountAsync(l =>
+                l.CreatedAtUtc >= DateTimeOffset.UtcNow.AddDays(-1) &&
+                ((l.TargetType == LockoutTargetType.User && l.TargetValue == username) ||
+                 (l.TargetType == LockoutTargetType.IpAddress && l.TargetValue == ipAddress)),
+            cancellationToken);
+
+        // Exponential backoff: base * 2^previousLockouts (max 8 hours)
+        var multiplier = Math.Pow(2, previousLockouts);
+        var duration = TimeSpan.FromMinutes(baseDuration.TotalMinutes * multiplier);
+        var maxDuration = TimeSpan.FromHours(8);
+
+        return duration > maxDuration ? maxDuration : duration;
     }
 }

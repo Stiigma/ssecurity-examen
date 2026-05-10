@@ -15,7 +15,9 @@ namespace ExamenSecurity.Api.Controllers;
 public sealed class SecurityController(
     AppDbContext dbContext,
     ISecurityAlertService alertService,
-    ISecurityAuditService securityAuditService) : ControllerBase
+    ISecurityAuditService securityAuditService,
+    IAccountLockoutService lockoutService,
+    ISecurityLogIntegrityService integrityService) : ControllerBase
 {
     [HttpGet("events")]
     public async Task<ActionResult<PagedResponse<SecurityEventResponse>>> GetEvents(
@@ -265,7 +267,81 @@ public sealed class SecurityController(
             jwtFailureLogging = true,
             accessDeniedLogging = true,
             sensitiveAdminActionLogging = true,
-            externalNotifications = "No implementadas a proposito: la demo usa alertas internas persistidas en SQL Server."
+            accountLockout = true,
+            externalNotifications = "No implementadas a proposito: la demo usa alertas internas persistidas en PostgreSQL."
         });
+    }
+
+    [HttpGet("lockouts")]
+    public async Task<ActionResult<IReadOnlyList<AccountLockoutResponse>>> GetActiveLockouts(CancellationToken cancellationToken)
+    {
+        var lockouts = await lockoutService.GetActiveLockoutsAsync(cancellationToken);
+        var response = lockouts.Select(l => new AccountLockoutResponse(
+            l.Id,
+            l.TargetType.ToString(),
+            l.TargetValue,
+            l.Reason,
+            l.LockedUntilUtc,
+            l.CreatedAtUtc,
+            l.IsActive,
+            l.AlertId,
+            l.UnlockedAtUtc,
+            l.UnlockedByUserId)).ToList();
+
+        return Ok(response);
+    }
+
+    [HttpPost("lockouts/{id:guid}/unlock")]
+    [Authorize(Roles = Roles.Admin)]
+    public async Task<IActionResult> UnlockAccount(Guid id, CancellationToken cancellationToken)
+    {
+        var unlocked = await lockoutService.UnlockAsync(id, User.GetUserId(), cancellationToken);
+        if (!unlocked)
+        {
+            return NotFound();
+        }
+
+        return NoContent();
+    }
+
+    [HttpGet("integrity-check")]
+    [Authorize(Roles = $"{Roles.Admin},{Roles.Auditor}")]
+    public async Task<ActionResult<IntegrityCheckResponse>> IntegrityCheck(
+        [FromQuery] DateTimeOffset? fromUtc,
+        [FromQuery] DateTimeOffset? toUtc,
+        CancellationToken cancellationToken)
+    {
+        var result = await integrityService.VerifyChainAsync(fromUtc, toUtc, cancellationToken);
+
+        await securityAuditService.AuditAsync(
+            new SecurityAuditRequest(
+                SecurityEventType.IntegrityCheckPerformed,
+                SecuritySeverity.Info,
+                "Succeeded",
+                $"Verificacion de integridad ejecutada. Valido={result.IsValid}, Eventos={result.TotalEventsChecked}.",
+                UserId: User.GetUserId(),
+                StatusCode: StatusCodes.Status200OK,
+                Metadata: new Dictionary<string, object?>
+                {
+                    ["isValid"] = result.IsValid,
+                    ["totalEventsChecked"] = result.TotalEventsChecked,
+                    ["firstBrokenEventId"] = result.FirstBrokenEventId
+                }),
+            cancellationToken);
+
+        var response = new IntegrityCheckResponse(
+            result.IsValid,
+            result.TotalEventsChecked,
+            result.FirstBrokenEventId,
+            result.MissingEventIds,
+            result.ComputedHashVsStoredHash,
+            result.Message);
+
+        if (!result.IsValid)
+        {
+            return Conflict(response);
+        }
+
+        return Ok(response);
     }
 }

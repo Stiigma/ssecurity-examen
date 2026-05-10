@@ -21,4 +21,6 @@ public sealed class SecurityEvent
     public string? MetadataJson { get; set; }
     public string CorrelationId { get; set; } = string.Empty;
     public DateTimeOffset CreatedAtUtc { get; set; }
+    public string? EventHash { get; set; }
+    public string? PreviousHash { get; set; }
 }

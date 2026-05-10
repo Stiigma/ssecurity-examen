@@ -9,11 +9,36 @@ namespace ExamenSecurity.Api.Services;
 public sealed class AuthService(
     AppDbContext dbContext,
     IJwtTokenService jwtTokenService,
-    ISecurityAuditService securityAuditService) : IAuthService
+    ISecurityAuditService securityAuditService,
+    IAccountLockoutService lockoutService,
+    IImpossibleTravelService impossibleTravelService,
+    IHttpContextAccessor httpContextAccessor) : IAuthService
 {
-    public async Task<LoginResponse?> LoginAsync(LoginRequest request, CancellationToken cancellationToken)
+    public async Task<AuthenticationResult> LoginAsync(LoginRequest request, CancellationToken cancellationToken)
     {
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        var clientIp = GetClientIp();
+
+        // Check if the IP is locked
+        if (!string.IsNullOrEmpty(clientIp) && await lockoutService.IsLockedAsync(clientIp, cancellationToken))
+        {
+            await securityAuditService.AuditAsync(
+                new SecurityAuditRequest(
+                    SecurityEventType.LockoutAttemptDuringLock,
+                    SecuritySeverity.Warning,
+                    "Rejected",
+                    "Intento de login desde una IP bloqueada temporalmente.",
+                    Username: normalizedEmail,
+                    StatusCode: StatusCodes.Status423Locked,
+                    Metadata: new Dictionary<string, object?>
+                    {
+                        ["clientIp"] = clientIp
+                    }),
+                cancellationToken);
+
+            return new AuthenticationResult(false, true, null, "Cuenta bloqueada temporalmente por seguridad.");
+        }
+
         var user = await dbContext.Users.FirstOrDefaultAsync(
             candidate => candidate.Email == normalizedEmail,
             cancellationToken);
@@ -30,7 +55,25 @@ public sealed class AuthService(
                     StatusCode: StatusCodes.Status401Unauthorized),
                 cancellationToken);
 
-            return null;
+            return new AuthenticationResult(false, false, null, "Credenciales invalidas.");
+        }
+
+        // Check if the user account is locked
+        if (await lockoutService.IsLockedAsync(user.Email, cancellationToken))
+        {
+            await securityAuditService.AuditAsync(
+                new SecurityAuditRequest(
+                    SecurityEventType.LockoutAttemptDuringLock,
+                    SecuritySeverity.Warning,
+                    "Rejected",
+                    "Intento de login contra una cuenta bloqueada temporalmente.",
+                    UserId: user.Id,
+                    Username: user.Email,
+                    Role: user.Role,
+                    StatusCode: StatusCodes.Status423Locked),
+                cancellationToken);
+
+            return new AuthenticationResult(false, true, null, "Cuenta bloqueada temporalmente por seguridad.");
         }
 
         if (!user.IsEnabled)
@@ -47,7 +90,7 @@ public sealed class AuthService(
                     StatusCode: StatusCodes.Status401Unauthorized),
                 cancellationToken);
 
-            return null;
+            return new AuthenticationResult(false, false, null, "Credenciales invalidas.");
         }
 
         if (!PasswordHasher.Verify(request.Password, user.PasswordHash))
@@ -64,7 +107,7 @@ public sealed class AuthService(
                     StatusCode: StatusCodes.Status401Unauthorized),
                 cancellationToken);
 
-            return null;
+            return new AuthenticationResult(false, false, null, "Credenciales invalidas.");
         }
 
         user.LastLoginAtUtc = DateTimeOffset.UtcNow;
@@ -83,10 +126,16 @@ public sealed class AuthService(
                 StatusCode: StatusCodes.Status200OK),
             cancellationToken);
 
-        return new LoginResponse(
-            token.Token,
-            token.ExpiresAtUtc,
-            new UserSummaryResponse(user.Id, user.Email, user.FullName, user.Role, user.Department, user.IsEnabled));
+        await impossibleTravelService.EvaluateAsync(user, clientIp ?? string.Empty, cancellationToken);
+
+        return new AuthenticationResult(
+            true,
+            false,
+            new LoginResponse(
+                token.Token,
+                token.ExpiresAtUtc,
+                new UserSummaryResponse(user.Id, user.Email, user.FullName, user.Role, user.Department, user.IsEnabled)),
+            null);
     }
 
     public async Task<CurrentUserResponse?> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken)
@@ -124,5 +173,22 @@ public sealed class AuthService(
             "Version fixed: la solicitud queda registrada como evento de seguridad sin exponer si el correo existe.");
 
         return response;
+    }
+
+    private string? GetClientIp()
+    {
+        var context = httpContextAccessor.HttpContext;
+        if (context is null)
+        {
+            return null;
+        }
+
+        var forwardedFor = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(forwardedFor))
+        {
+            return forwardedFor.Split(',')[0].Trim();
+        }
+
+        return context.Connection.RemoteIpAddress?.ToString();
     }
 }

@@ -12,6 +12,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<ApiClient> ApiClients => Set<ApiClient>();
     public DbSet<SecurityEvent> SecurityEvents => Set<SecurityEvent>();
     public DbSet<SecurityAlert> SecurityAlerts => Set<SecurityAlert>();
+    public DbSet<AccountLockout> AccountLockouts => Set<AccountLockout>();
+    public DbSet<UserLoginLocation> UserLoginLocations => Set<UserLoginLocation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -96,6 +98,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(securityEvent => securityEvent.Message).HasMaxLength(1000).IsRequired();
             entity.Property(securityEvent => securityEvent.MetadataJson).HasMaxLength(4000);
             entity.Property(securityEvent => securityEvent.CorrelationId).HasMaxLength(80).IsRequired();
+            entity.Property(securityEvent => securityEvent.EventHash).HasMaxLength(128);
+            entity.Property(securityEvent => securityEvent.PreviousHash).HasMaxLength(128);
             entity.HasOne(securityEvent => securityEvent.User)
                 .WithMany()
                 .HasForeignKey(securityEvent => securityEvent.UserId)
@@ -122,6 +126,40 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany()
                 .HasForeignKey(alert => alert.AcknowledgedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<AccountLockout>(entity =>
+        {
+            entity.HasKey(lockout => lockout.Id);
+            entity.HasIndex(lockout => lockout.TargetValue);
+            entity.HasIndex(lockout => lockout.LockedUntilUtc);
+            entity.HasIndex(lockout => lockout.IsActive);
+            entity.Property(lockout => lockout.TargetType).HasConversion<string>().HasMaxLength(40).IsRequired();
+            entity.Property(lockout => lockout.TargetValue).HasMaxLength(256).IsRequired();
+            entity.Property(lockout => lockout.Reason).HasMaxLength(500).IsRequired();
+            entity.HasOne(lockout => lockout.Alert)
+                .WithMany()
+                .HasForeignKey(lockout => lockout.AlertId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(lockout => lockout.UnlockedByUser)
+                .WithMany()
+                .HasForeignKey(lockout => lockout.UnlockedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<UserLoginLocation>(entity =>
+        {
+            entity.HasKey(ull => ull.Id);
+            entity.HasIndex(ull => new { ull.UserId, ull.LoginAtUtc });
+            entity.Property(ull => ull.IpAddress).HasMaxLength(64).IsRequired();
+            entity.Property(ull => ull.CountryCode).HasMaxLength(2).IsRequired();
+            entity.Property(ull => ull.CountryName).HasMaxLength(120).IsRequired();
+            entity.Property(ull => ull.Latitude).HasPrecision(10, 6);
+            entity.Property(ull => ull.Longitude).HasPrecision(10, 6);
+            entity.HasOne(ull => ull.User)
+                .WithMany(user => user.LoginLocations)
+                .HasForeignKey(ull => ull.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

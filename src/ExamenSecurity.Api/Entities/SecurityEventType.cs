@@ -17,5 +17,12 @@ public enum SecurityEventType
     ConfigurationChanged = 13,
     SecurityTicketCreated = 14,
     AlertAcknowledged = 15,
-    UnhandledException = 16
+    UnhandledException = 16,
+    RateLimitExceeded = 17,
+    AccountLocked = 18,
+    AccountUnlocked = 19,
+    LockoutAttemptDuringLock = 20,
+    IntegrityCheckPerformed = 21,
+    HoneytokenTriggered = 22,
+    ImpossibleTravelDetected = 23
 }

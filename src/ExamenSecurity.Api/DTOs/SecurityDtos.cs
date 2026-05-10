@@ -45,8 +45,28 @@ public sealed record SecurityDashboardSummaryResponse(
     int AccessDeniedLast10Minutes,
     DateTimeOffset GeneratedAtUtc);
 
+public sealed record AccountLockoutResponse(
+    Guid Id,
+    string TargetType,
+    string TargetValue,
+    string Reason,
+    DateTimeOffset LockedUntilUtc,
+    DateTimeOffset CreatedAtUtc,
+    bool IsActive,
+    Guid? AlertId,
+    DateTimeOffset? UnlockedAtUtc,
+    Guid? UnlockedByUserId);
+
 public sealed record PagedResponse<T>(
     IReadOnlyList<T> Items,
     int Page,
     int PageSize,
     int Total);
+
+public sealed record IntegrityCheckResponse(
+    bool IsValid,
+    int TotalEventsChecked,
+    Guid? FirstBrokenEventId,
+    IReadOnlyList<Guid> MissingEventIds,
+    string? ComputedHashVsStoredHash,
+    string Message);

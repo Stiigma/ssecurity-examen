@@ -42,7 +42,14 @@ public sealed class DemoScenarioService : IDemoScenarioService
                 "A09:2025 - Security Logging and Alerting Failures",
                 "Crear un ticket con isSecurityRelevant=true.",
                 "El ticket crea un evento SecurityTicketCreated y una alerta SecurityTicketRequiresReview.",
-                "Una senal humana de incidente ya no queda perdida dentro del ruido operacional.")
+                "Una senal humana de incidente ya no queda perdida dentro del ruido operacional."),
+            new DemoScenarioResponse(
+                "A09-HONEYTOKEN",
+                "Deteccion de sondeo con endpoint senoelo",
+                "A09:2025 - Security Logging and Alerting Failures",
+                "Llamar GET /api/internal/backup desde un scanner o curl anonimo.",
+                "Alerta CRITICA HoneytokenAccessed generada inmediatamente con todos los metadatos del request.",
+                "Los atacantes y scanners automatizados se delatan al tocar endpoints que no deberian existir para usuarios legitimos.")
         ];
     }
 
@@ -56,6 +63,6 @@ public sealed class DemoScenarioService : IDemoScenarioService
             AccessDeniedIsAudited: true,
             AdminActionsAreAudited: true,
             SuspiciousPatternsCreateAlerts: true,
-            "La aplicacion registra eventos de seguridad en SQL Server y genera alertas internas accionables.");
+            "La aplicacion registra eventos de seguridad en PostgreSQL y genera alertas internas accionables.");
     }
 }

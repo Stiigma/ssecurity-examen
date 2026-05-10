@@ -14,17 +14,26 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
     [HttpPost("login")]
     public async Task<ActionResult<LoginResponse>> Login(LoginRequest request, CancellationToken cancellationToken)
     {
-        var response = await authService.LoginAsync(request, cancellationToken);
-        if (response is null)
+        var result = await authService.LoginAsync(request, cancellationToken);
+        if (result.IsLocked)
+        {
+            return StatusCode(StatusCodes.Status423Locked, new
+            {
+                message = result.ErrorMessage,
+                a09 = "Version fixed: la cuenta o IP esta bloqueada temporalmente."
+            });
+        }
+
+        if (!result.IsSuccess)
         {
             return Unauthorized(new
             {
-                message = "Credenciales invalidas.",
+                message = result.ErrorMessage,
                 a09 = "Version fixed: el intento fallido quedo registrado como evento de seguridad."
             });
         }
 
-        return Ok(response);
+        return Ok(result.LoginResponse);
     }
 
     [Authorize]

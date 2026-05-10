@@ -8,5 +8,7 @@ public enum SecurityAlertType
     StudentRecordProbing = 4,
     SensitiveAdminChange = 5,
     SecurityTicketRequiresReview = 6,
-    RepeatedUnhandledErrors = 7
+    RepeatedUnhandledErrors = 7,
+    HoneytokenAccessed = 8,
+    ImpossibleTravel = 9
 }

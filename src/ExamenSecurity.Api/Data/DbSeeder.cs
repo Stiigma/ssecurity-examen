@@ -166,14 +166,13 @@ public sealed class DbSeeder(AppDbContext dbContext, ILogger<DbSeeder> logger)
             try
             {
                 await dbContext.Database.EnsureCreatedAsync(cancellationToken);
-                await EnsureFixedSecuritySchemaAsync(cancellationToken);
                 return;
             }
             catch (Exception exception) when (attempt < maxAttempts)
             {
                 logger.LogWarning(
                     exception,
-                    "SQL Server is not ready yet. Attempt {Attempt}/{MaxAttempts}.",
+                    "PostgreSQL is not ready yet. Attempt {Attempt}/{MaxAttempts}.",
                     attempt,
                     maxAttempts);
 
@@ -182,73 +181,5 @@ public sealed class DbSeeder(AppDbContext dbContext, ILogger<DbSeeder> logger)
         }
 
         await dbContext.Database.EnsureCreatedAsync(cancellationToken);
-        await EnsureFixedSecuritySchemaAsync(cancellationToken);
-    }
-
-    private async Task EnsureFixedSecuritySchemaAsync(CancellationToken cancellationToken)
-    {
-        await dbContext.Database.ExecuteSqlRawAsync(
-            """
-            IF OBJECT_ID(N'[dbo].[SecurityEvents]', N'U') IS NULL
-            BEGIN
-                CREATE TABLE [dbo].[SecurityEvents] (
-                    [Id] uniqueidentifier NOT NULL CONSTRAINT [PK_SecurityEvents] PRIMARY KEY,
-                    [EventType] nvarchar(80) NOT NULL,
-                    [Severity] nvarchar(40) NOT NULL,
-                    [UserId] uniqueidentifier NULL,
-                    [Username] nvarchar(256) NULL,
-                    [Role] nvarchar(40) NULL,
-                    [IpAddress] nvarchar(64) NULL,
-                    [UserAgent] nvarchar(512) NULL,
-                    [HttpMethod] nvarchar(16) NULL,
-                    [Path] nvarchar(512) NULL,
-                    [StatusCode] int NULL,
-                    [ResourceType] nvarchar(120) NULL,
-                    [ResourceId] nvarchar(120) NULL,
-                    [Outcome] nvarchar(80) NOT NULL,
-                    [Message] nvarchar(1000) NOT NULL,
-                    [MetadataJson] nvarchar(4000) NULL,
-                    [CorrelationId] nvarchar(80) NOT NULL,
-                    [CreatedAtUtc] datetimeoffset NOT NULL,
-                    CONSTRAINT [FK_SecurityEvents_Users_UserId] FOREIGN KEY ([UserId]) REFERENCES [dbo].[Users] ([Id]) ON DELETE SET NULL
-                );
-
-                CREATE INDEX [IX_SecurityEvents_CreatedAtUtc] ON [dbo].[SecurityEvents] ([CreatedAtUtc]);
-                CREATE INDEX [IX_SecurityEvents_EventType] ON [dbo].[SecurityEvents] ([EventType]);
-                CREATE INDEX [IX_SecurityEvents_Severity] ON [dbo].[SecurityEvents] ([Severity]);
-                CREATE INDEX [IX_SecurityEvents_Username] ON [dbo].[SecurityEvents] ([Username]);
-                CREATE INDEX [IX_SecurityEvents_IpAddress] ON [dbo].[SecurityEvents] ([IpAddress]);
-            END
-            """,
-            cancellationToken);
-
-        await dbContext.Database.ExecuteSqlRawAsync(
-            """
-            IF OBJECT_ID(N'[dbo].[SecurityAlerts]', N'U') IS NULL
-            BEGIN
-                CREATE TABLE [dbo].[SecurityAlerts] (
-                    [Id] uniqueidentifier NOT NULL CONSTRAINT [PK_SecurityAlerts] PRIMARY KEY,
-                    [AlertType] nvarchar(80) NOT NULL,
-                    [Severity] nvarchar(40) NOT NULL,
-                    [Title] nvarchar(200) NOT NULL,
-                    [Description] nvarchar(1000) NOT NULL,
-                    [RelatedUserId] uniqueidentifier NULL,
-                    [RelatedUsername] nvarchar(256) NULL,
-                    [RelatedIpAddress] nvarchar(64) NULL,
-                    [EventCount] int NOT NULL,
-                    [IsAcknowledged] bit NOT NULL,
-                    [AcknowledgedByUserId] uniqueidentifier NULL,
-                    [AcknowledgedAtUtc] datetimeoffset NULL,
-                    [CreatedAtUtc] datetimeoffset NOT NULL,
-                    CONSTRAINT [FK_SecurityAlerts_Users_RelatedUserId] FOREIGN KEY ([RelatedUserId]) REFERENCES [dbo].[Users] ([Id]) ON DELETE SET NULL,
-                    CONSTRAINT [FK_SecurityAlerts_Users_AcknowledgedByUserId] FOREIGN KEY ([AcknowledgedByUserId]) REFERENCES [dbo].[Users] ([Id])
-                );
-
-                CREATE INDEX [IX_SecurityAlerts_CreatedAtUtc] ON [dbo].[SecurityAlerts] ([CreatedAtUtc]);
-                CREATE INDEX [IX_SecurityAlerts_AlertType] ON [dbo].[SecurityAlerts] ([AlertType]);
-                CREATE INDEX [IX_SecurityAlerts_IsAcknowledged] ON [dbo].[SecurityAlerts] ([IsAcknowledged]);
-            END
-            """,
-            cancellationToken);
     }
 }

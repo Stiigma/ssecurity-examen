@@ -14,4 +14,5 @@ public sealed class AppUser
 
     public StudentRecord? StudentRecord { get; set; }
     public ICollection<SupportTicket> SupportTickets { get; set; } = [];
+    public ICollection<UserLoginLocation> LoginLocations { get; set; } = [];
 }

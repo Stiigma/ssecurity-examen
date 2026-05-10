@@ -11,6 +11,12 @@ public sealed record LoginResponse(
     DateTimeOffset ExpiresAtUtc,
     UserSummaryResponse User);
 
+public sealed record AuthenticationResult(
+    bool IsSuccess,
+    bool IsLocked,
+    LoginResponse? LoginResponse,
+    string? ErrorMessage);
+
 public sealed record CurrentUserResponse(
     Guid Id,
     string Email,

@@ -2,6 +2,7 @@ using System.Text;
 using ExamenSecurity.Api;
 using ExamenSecurity.Api.Data;
 using ExamenSecurity.Api.Entities;
+using ExamenSecurity.Api.Middleware;
 using ExamenSecurity.Api.Options;
 using ExamenSecurity.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -16,11 +17,29 @@ builder.Services.AddHttpContextAccessor();
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<CorsOptions>(builder.Configuration.GetSection(CorsOptions.SectionName));
+builder.Services.Configure<RateLimitingOptions>(builder.Configuration.GetSection(RateLimitingOptions.SectionName));
+builder.Services.Configure<AccountLockoutOptions>(builder.Configuration.GetSection(AccountLockoutOptions.SectionName));
+builder.Services.Configure<LogIntegrityOptions>(builder.Configuration.GetSection(LogIntegrityOptions.SectionName));
+builder.Services.Configure<ExternalLogForwardingOptions>(builder.Configuration.GetSection(ExternalLogForwardingOptions.SectionName));
+builder.Services.Configure<HoneytokenOptions>(builder.Configuration.GetSection(HoneytokenOptions.SectionName));
+builder.Services.Configure<ImpossibleTravelOptions>(builder.Configuration.GetSection(ImpossibleTravelOptions.SectionName));
 
-builder.Services.AddDbContext<AppDbContext>(options =>
+builder.Services.AddMemoryCache();
+
+if (builder.Environment.IsEnvironment("Testing"))
 {
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
-});
+    builder.Services.AddDbContext<AppDbContext>(options =>
+    {
+        options.UseInMemoryDatabase("TestDb");
+    });
+}
+else
+{
+    builder.Services.AddDbContext<AppDbContext>(options =>
+    {
+        options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+    });
+}
 
 builder.Services.AddScoped<DbSeeder>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
@@ -31,6 +50,11 @@ builder.Services.AddScoped<ISupportTicketService, SupportTicketService>();
 builder.Services.AddScoped<IDemoScenarioService, DemoScenarioService>();
 builder.Services.AddScoped<ISecurityAuditService, SecurityAuditService>();
 builder.Services.AddScoped<ISecurityAlertService, SecurityAlertService>();
+builder.Services.AddScoped<IAccountLockoutService, AccountLockoutService>();
+builder.Services.AddScoped<ISecurityLogIntegrityService, SecurityLogIntegrityService>();
+builder.Services.AddSingleton<IExternalLogForwarder, ExternalLogForwarder>();
+builder.Services.AddScoped<IGeoLocationService, GeoLocationService>();
+builder.Services.AddScoped<IImpossibleTravelService, ImpossibleTravelService>();
 
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("JWT configuration is missing.");
@@ -131,6 +155,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<RateLimitingMiddleware>();
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseHttpsRedirection();
 app.UseCors("Frontend");

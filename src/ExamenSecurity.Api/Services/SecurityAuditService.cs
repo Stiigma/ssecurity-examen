@@ -4,6 +4,7 @@ using ExamenSecurity.Api;
 using ExamenSecurity.Api.Data;
 using ExamenSecurity.Api.Entities;
 using ExamenSecurity.Api.Security;
+using Microsoft.EntityFrameworkCore;
 
 namespace ExamenSecurity.Api.Services;
 
@@ -11,6 +12,8 @@ public sealed class SecurityAuditService(
     AppDbContext dbContext,
     IHttpContextAccessor httpContextAccessor,
     ISecurityAlertService alertService,
+    ISecurityLogIntegrityService integrityService,
+    IExternalLogForwarder externalLogForwarder,
     ILogger<SecurityAuditService> logger) : ISecurityAuditService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -62,7 +65,20 @@ public sealed class SecurityAuditService(
         };
 
         dbContext.SecurityEvents.Add(securityEvent);
+
+        // Log integrity: compute hash chain before saving
+        var lastEvent = await dbContext.SecurityEvents
+            .AsNoTracking()
+            .OrderByDescending(e => e.CreatedAtUtc)
+            .Select(e => new { e.EventHash })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var previousHash = lastEvent?.EventHash ?? string.Empty;
+        securityEvent.PreviousHash = previousHash;
+        securityEvent.EventHash = await integrityService.ComputeHashAsync(securityEvent, previousHash, cancellationToken);
+
         await dbContext.SaveChangesAsync(cancellationToken);
+        externalLogForwarder.Forward(securityEvent);
         await alertService.EvaluateAsync(securityEvent, cancellationToken);
 
         logger.LogInformation(
